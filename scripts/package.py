@@ -11,7 +11,11 @@ output = root / "dist" / f"better-cover-{version}.zip"
 output.parent.mkdir(exist_ok=True)
 with ZipFile(output, "w", ZIP_DEFLATED) as archive:
     for path in sorted(component.rglob("*")):
-        if path.is_file() and "__pycache__" not in path.parts and path.suffix in (".py", ".json", ".png"):
+        if (
+            path.is_file()
+            and "__pycache__" not in path.parts
+            and path.suffix in (".py", ".json", ".png")
+        ):
             archive.write(path, path.relative_to(root))
     archive.write(root / "README.md", "README.md")
     archive.write(root / "LICENSE", "LICENSE")

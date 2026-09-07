@@ -4,7 +4,7 @@ from .const import DOMAIN
 from .controller import Controller
 from .group import GroupController
 
-PLATFORMS = ["cover", "switch", "sensor", "button"]
+PLATFORMS = ["cover", "switch", "sensor", "button", "number", "time", "select"]
 
 
 async def async_setup_entry(hass, entry):
@@ -21,7 +21,16 @@ async def async_setup_entry(hass, entry):
 
 
 async def async_reload_entry(hass, entry):
-    await hass.config_entries.async_reload(entry.entry_id)
+    controller = hass.data[DOMAIN][entry.entry_id]
+    values = entry.options or entry.data
+    structural = ("cover_entity", "control_type", "name")
+    if isinstance(controller, GroupController):
+        controller.config = dict(values)
+        controller.publish()
+    elif any(controller.config.get(key) != values.get(key) for key in structural):
+        await hass.config_entries.async_reload(entry.entry_id)
+    else:
+        await controller.update_config(values)
 
 
 async def async_unload_entry(hass, entry):

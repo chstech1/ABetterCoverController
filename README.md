@@ -19,7 +19,7 @@ Future tagged releases appear as updates in HACS. This is a custom repository, n
 
 ## Manual install
 
-1. Download `better-cover-0.1.1.zip` from [Releases](https://github.com/chstech1/ABetterCoverController/releases), or build it locally and extract it.
+1. Download `better-cover-0.2.0.zip` from [Releases](https://github.com/chstech1/ABetterCoverController/releases), or build it locally and extract it.
 2. Copy the included `custom_components/better_cover` folder into your Home Assistant configuration folder, producing `/config/custom_components/better_cover/manifest.json`.
 3. Restart Home Assistant.
 4. Open **Settings → Devices & services → Add integration → Better Cover**.
@@ -31,17 +31,33 @@ The new controller starts with automatic movement OFF. After you turn it on, its
 
 Tested with Home Assistant **2026.2.3 / Python 3.13**. Hardware behavior still needs verification on your installation.
 
-## Change settings after setup
+## Configure directly from the device
 
-Open **Settings → Devices & services → Integrations → Better Cover**. Find the blind or group you want to edit and select **Configure** (the gear icon). Choose a settings section, submit the changes, then select **Save settings** from the menu.
+Open **Settings → Devices & services → Devices** and select your Better Cover blind or group. Its **Configuration** section contains editable entities. You can also add these entities to any dashboard.
 
-The cover, automatic-control switch, resume button, and status sensor are daily controls. They do not replace the integration's configuration screen.
+| Device settings | Controls |
+|---|---|
+| Normal and window-open limits, daytime/nighttime/hot-weather positions | Number fields, all in percent open |
+| Window direction and sun geometry | Number fields with units; geometry matches lift or tilt |
+| Daytime start, nighttime privacy, morning reset | Time controls |
+| Lux thresholds, temperature deadband, vacancy duration, movement interval | Number fields |
+| Position inversion and window limits during manual pause | Switches |
+| Hardware cover, control channel, room light, outside temperature, thermostat, window contact, home presence, room occupancy | Dropdowns |
+| Group membership | Add group member / Remove group member dropdowns on the group device |
 
-If you installed v0.1.0, update to v0.1.1 or later in HACS and restart Home Assistant. The initial release mistakenly classified Better Cover as a helper. The update moves it to Integrations while preserving your existing entries and settings; do not delete and recreate them.
+**Each change saves automatically.** There is no separate Save button on the device. Normal setting changes apply live and preserve manual pauses and vacancy timers. Changing the occupancy sensor restarts its vacancy timer. Changing the hardware cover or lift/tilt channel reloads the controller because its supported controls change; saved manual pauses survive this reload.
+
+Sensor choices show Home Assistant entity IDs. Select **Not configured** to remove an optional sensor. Choose outside temperature and thermostat one at a time; temperature control becomes active once both are set. Invalid limits show an error without saving—for example, raise the maximum before raising the minimum above it.
+
+A group must keep at least one member. Select a member in its Add or Remove dropdown to change membership immediately; the dropdown then returns to **Choose a member**. Individual members retain their own configuration.
+
+Use the device's normal edit/rename controls to change its displayed name. The integration setup remains available for creating new controllers and groups; its Configure menu is an alternative editor for the same saved settings, not a required workflow.
+
+Existing installations: update to **v0.2.0** in HACS and restart Home Assistant. The configuration entities are added to your existing Better Cover devices. Existing entries and settings remain; do not delete and recreate them. Version 0.1.0 also incorrectly classified Better Cover as a helper; updating fixes that classification.
 
 ## Daily controls
 
-Each controller creates four entities:
+Each controller has four daily-control entities, plus its configuration entities:
 
 | Control | What it does |
 |---|---|

@@ -89,7 +89,7 @@ def decide(
     return Decision(clamp(target, config, window_open), reason)
 
 
-def validate(config):
+def validate(config, require_temperature_pair=True):
     if (
         config["min_position"] > config["max_position"]
         or config["window_min"] > config["window_max"]
@@ -99,7 +99,9 @@ def validate(config):
         return "same_times"
     if config.get("slat_spacing", 1) > config.get("slat_width", 1):
         return "invalid_slats"
-    if bool(config.get("temperature_entity")) != bool(config.get("thermostat_entity")):
+    if require_temperature_pair and bool(config.get("temperature_entity")) != bool(
+        config.get("thermostat_entity")
+    ):
         return "temperature_pair"
     if config.get("dark_lux", 0) >= config.get("bright_lux", 1):
         return "invalid_light_thresholds"

@@ -34,6 +34,7 @@ class Controller:
         self.moving_until = None
         self.context_ids = []
         self.listeners = set()
+        self._state_unsub = None
         self.lock = asyncio.Lock()
         self.store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
 
@@ -83,14 +84,31 @@ class Controller:
         paused = saved.get("paused_at")
         self.paused_at = dt_util.parse_datetime(paused) if paused else None
         # Occupancy timer starts fresh after restart: downtime is not evidence of vacancy.
-        entities = ["sun.sun"] + [v for k, v in self.config.items() if k.endswith("_entity") and v]
-        self.entry.async_on_unload(
-            async_track_state_change_event(self.hass, entities, self.changed)
-        )
+        self.watch_sources()
+        self.entry.async_on_unload(lambda: self._state_unsub())
         self.entry.async_on_unload(
             async_track_time_interval(self.hass, self.tick, timedelta(seconds=30))
         )
         self.entry.async_on_unload(self.hass.bus.async_listen("call_service", self.service_called))
+        await self.evaluate()
+
+    def watch_sources(self):
+        if self._state_unsub:
+            self._state_unsub()
+        entities = ["sun.sun"] + [v for k, v in self.config.items() if k.endswith("_entity") and v]
+        self._state_unsub = async_track_state_change_event(self.hass, entities, self.changed)
+
+    async def update_config(self, values):
+        async with self.lock:
+            if self.config.get("occupancy_entity") != values.get("occupancy_entity"):
+                self.empty_since = None
+            if self.config.get("light_entity") != values.get("light_entity"):
+                self.dark = False
+            if self.config.get("invert_position") != values.get("invert_position"):
+                self.expected = None
+                self.moving_until = None
+            self.config = {**DEFAULTS, **values}
+            self.watch_sources()
         await self.evaluate()
 
     async def save(self):
