@@ -1,7 +1,7 @@
 {
   "domain": "better_cover",
   "name": "Better Cover",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "config_flow": true,
   "dependencies": [
     "sun",
@@ -14,5 +14,5 @@
   "requirements": [],
   "documentation": "https://github.com/chstech1/ABetterCoverController",
   "issue_tracker": "https://github.com/chstech1/ABetterCoverController/issues",
-  "integration_type": "helper"
+  "integration_type": "service"
 }

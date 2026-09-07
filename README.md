@@ -19,7 +19,7 @@ Future tagged releases appear as updates in HACS. This is a custom repository, n
 
 ## Manual install
 
-1. Download `better-cover-0.1.0.zip` from [Releases](https://github.com/chstech1/ABetterCoverController/releases), or build it locally and extract it.
+1. Download `better-cover-0.1.1.zip` from [Releases](https://github.com/chstech1/ABetterCoverController/releases), or build it locally and extract it.
 2. Copy the included `custom_components/better_cover` folder into your Home Assistant configuration folder, producing `/config/custom_components/better_cover/manifest.json`.
 3. Restart Home Assistant.
 4. Open **Settings → Devices & services → Add integration → Better Cover**.
@@ -30,6 +30,14 @@ Future tagged releases appear as updates in HACS. This is a custom repository, n
 The new controller starts with automatic movement OFF. After you turn it on, its enabled state and manual pause survive restarts. Disable any existing Adaptive Cover or other automatic positioning for the same cover to avoid conflicting commands.
 
 Tested with Home Assistant **2026.2.3 / Python 3.13**. Hardware behavior still needs verification on your installation.
+
+## Change settings after setup
+
+Open **Settings → Devices & services → Integrations → Better Cover**. Find the blind or group you want to edit and select **Configure** (the gear icon). Choose a settings section, submit the changes, then select **Save settings** from the menu.
+
+The cover, automatic-control switch, resume button, and status sensor are daily controls. They do not replace the integration's configuration screen.
+
+If you installed v0.1.0, update to v0.1.1 or later in HACS and restart Home Assistant. The initial release mistakenly classified Better Cover as a helper. The update moves it to Integrations while preserving your existing entries and settings; do not delete and recreate them.
 
 ## Daily controls
 
