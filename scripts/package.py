@@ -14,4 +14,5 @@ with ZipFile(output, "w", ZIP_DEFLATED) as archive:
         if path.is_file() and "__pycache__" not in path.parts and path.suffix in (".py", ".json", ".png"):
             archive.write(path, path.relative_to(root))
     archive.write(root / "README.md", "README.md")
+    archive.write(root / "LICENSE", "LICENSE")
 print(output)
