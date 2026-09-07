@@ -1,0 +1,229 @@
+{
+  "title": "Better Cover",
+  "config": {
+    "step": {
+      "shade": {
+        "title": "Choose a blind or shade",
+        "description": "All settings use percent OPEN: 0 closed, 100 open. Add separate controllers for lift and tilt if your blind supports both.",
+        "data": {
+          "name": "Name",
+          "cover_entity": "Blind or shade",
+          "control_type": "Control",
+          "invert_position": "This device reports 0% as fully open"
+        }
+      },
+      "sun": {
+        "title": "Sun tracking",
+        "description": "Face outward through the window to measure its direction. For lift, measure the covered height and choose how far sunlight may reach indoors. For tilt, 100% open must mean horizontal slats and 0% closed must mean vertical slats; use inversion if needed.",
+        "data": {
+          "azimuth": "Direction the window faces (0 north, 90 east, 180 south, 270 west)",
+          "window_height": "Covered window height (meters)",
+          "sun_depth": "How far sunlight may enter the room (meters)",
+          "slat_width": "Slat width (millimeters)",
+          "slat_spacing": "Spacing between slats (millimeters)"
+        }
+      },
+      "schedule": {
+        "title": "Day and night",
+        "description": "Nighttime privacy overrides brightness and temperature. A manual pause holds your chosen position until a resume event. Times use Home Assistant’s time zone.",
+        "data": {
+          "day_start": "Daytime begins",
+          "night_start": "Nighttime privacy begins",
+          "day_position": "Daytime / dark-room position (% open)",
+          "night_position": "Nighttime position (% open)"
+        }
+      },
+      "limits": {
+        "title": "Travel limits",
+        "description": "The window-open range replaces the normal range. Missing or unavailable window sensors also use the window-open range. These settings apply to this controller’s lift or tilt percentage.",
+        "data": {
+          "min_position": "Minimum opening (%)",
+          "max_position": "Maximum opening (%)",
+          "window_entity": "Window contact sensor (on means open)",
+          "window_min": "Window-open minimum opening (%)",
+          "window_max": "Window-open maximum opening (%)"
+        }
+      },
+      "comfort": {
+        "title": "Light and temperature (optional)",
+        "description": "Skip sensors you do not use. Low light favors the daytime position. In direct sun, warmer outside than the thermostat target favors shading; cooler outside favors opening. Choose both temperature sources or neither. Temperatures are converted to Home Assistant’s units.",
+        "data": {
+          "light_entity": "Room brightness sensor (lux)",
+          "dark_lux": "Room is dark at or below (lux)",
+          "bright_lux": "Room is bright again at or above (lux)",
+          "temperature_entity": "Outside temperature sensor",
+          "thermostat_entity": "Thermostat or target-temperature sensor",
+          "temperature_deadband": "Temperature difference before reacting (your HA temperature units)",
+          "hot_position": "Position when warmer outside (% open)"
+        }
+      },
+      "manual": {
+        "title": "Manual control and resume",
+        "description": "Manual moves pause sun and schedule control. Resume when everyone leaves, after continuous room vacancy, or at the morning reset. Turning Automatic control OFF stays off. Window-open limits can still act during a pause, but OFF disables automatic movement.",
+        "data": {
+          "home_entity": "Anyone-home binary sensor (on means someone is home)",
+          "occupancy_entity": "Room occupancy sensor (on means occupied)",
+          "empty_hours": "Resume after room is empty for (hours)",
+          "reset_time": "Morning reset time",
+          "window_overrides_manual": "Enforce window-open limits during a manual pause",
+          "min_change": "Minimum position change (%)",
+          "interval_minutes": "Minimum time between automatic moves (minutes)"
+        }
+      },
+      "group": {
+        "title": "Group blinds together",
+        "description": "Members keep their individual sun tracking, sensor choices, direction, and limits. Group moves pause every member. Group resume enables automatic control for every member.",
+        "data": {
+          "name": "Name",
+          "members": "Blinds / shades in this group"
+        }
+      },
+      "settings": {
+        "title": "Ready to use",
+        "description": "Save now to use the defaults, or customize any section. Default daytime is 08:00–21:00, open by day and closed at night, with sun tracking. Automatic control starts OFF so you can review the target first.",
+        "menu_options": {
+          "finish": "Save settings",
+          "shade": "Blind and sun tracking",
+          "schedule": "Day and night",
+          "limits": "Normal and window-open limits",
+          "comfort": "Room light and outside temperature",
+          "manual": "Manual control and reset triggers"
+        }
+      },
+      "user": {
+        "title": "Better Cover",
+        "menu_options": {
+          "shade": "Add a blind or shade",
+          "group": "Group existing blinds"
+        }
+      }
+    },
+    "error": {
+      "use_original_cover": "Choose the original hardware cover. Use a Better Cover group to combine controllers.",
+      "invalid_limits": "Minimum opening must not exceed maximum opening.",
+      "same_times": "Day and night must start at different times.",
+      "position_required": "Choose a cover that supports percentage control for the selected lift or tilt channel.",
+      "already_configured": "This cover and control channel already have a controller.",
+      "invalid_light_thresholds": "Bright-again lux must be greater than dark lux.",
+      "invalid_slats": "Slat spacing must not exceed slat width.",
+      "temperature_pair": "Choose both outside temperature and thermostat sources, or leave both empty.",
+      "invalid_members": "Select at least one existing blind controller."
+    },
+    "abort": {
+      "no_members": "Add at least one blind or shade before creating a group."
+    }
+  },
+  "options": {
+    "step": {
+      "shade": {
+        "title": "Choose a blind or shade",
+        "description": "All settings use percent OPEN: 0 closed, 100 open. Add separate controllers for lift and tilt if your blind supports both.",
+        "data": {
+          "name": "Name",
+          "cover_entity": "Blind or shade",
+          "control_type": "Control",
+          "invert_position": "This device reports 0% as fully open"
+        }
+      },
+      "sun": {
+        "title": "Sun tracking",
+        "description": "Face outward through the window to measure its direction. For lift, measure the covered height and choose how far sunlight may reach indoors. For tilt, 100% open must mean horizontal slats and 0% closed must mean vertical slats; use inversion if needed.",
+        "data": {
+          "azimuth": "Direction the window faces (0 north, 90 east, 180 south, 270 west)",
+          "window_height": "Covered window height (meters)",
+          "sun_depth": "How far sunlight may enter the room (meters)",
+          "slat_width": "Slat width (millimeters)",
+          "slat_spacing": "Spacing between slats (millimeters)"
+        }
+      },
+      "schedule": {
+        "title": "Day and night",
+        "description": "Nighttime privacy overrides brightness and temperature. A manual pause holds your chosen position until a resume event. Times use Home Assistant’s time zone.",
+        "data": {
+          "day_start": "Daytime begins",
+          "night_start": "Nighttime privacy begins",
+          "day_position": "Daytime / dark-room position (% open)",
+          "night_position": "Nighttime position (% open)"
+        }
+      },
+      "limits": {
+        "title": "Travel limits",
+        "description": "The window-open range replaces the normal range. Missing or unavailable window sensors also use the window-open range. These settings apply to this controller’s lift or tilt percentage.",
+        "data": {
+          "min_position": "Minimum opening (%)",
+          "max_position": "Maximum opening (%)",
+          "window_entity": "Window contact sensor (on means open)",
+          "window_min": "Window-open minimum opening (%)",
+          "window_max": "Window-open maximum opening (%)"
+        }
+      },
+      "comfort": {
+        "title": "Light and temperature (optional)",
+        "description": "Skip sensors you do not use. Low light favors the daytime position. In direct sun, warmer outside than the thermostat target favors shading; cooler outside favors opening. Choose both temperature sources or neither. Temperatures are converted to Home Assistant’s units.",
+        "data": {
+          "light_entity": "Room brightness sensor (lux)",
+          "dark_lux": "Room is dark at or below (lux)",
+          "bright_lux": "Room is bright again at or above (lux)",
+          "temperature_entity": "Outside temperature sensor",
+          "thermostat_entity": "Thermostat or target-temperature sensor",
+          "temperature_deadband": "Temperature difference before reacting (your HA temperature units)",
+          "hot_position": "Position when warmer outside (% open)"
+        }
+      },
+      "manual": {
+        "title": "Manual control and resume",
+        "description": "Manual moves pause sun and schedule control. Resume when everyone leaves, after continuous room vacancy, or at the morning reset. Turning Automatic control OFF stays off. Window-open limits can still act during a pause, but OFF disables automatic movement.",
+        "data": {
+          "home_entity": "Anyone-home binary sensor (on means someone is home)",
+          "occupancy_entity": "Room occupancy sensor (on means occupied)",
+          "empty_hours": "Resume after room is empty for (hours)",
+          "reset_time": "Morning reset time",
+          "window_overrides_manual": "Enforce window-open limits during a manual pause",
+          "min_change": "Minimum position change (%)",
+          "interval_minutes": "Minimum time between automatic moves (minutes)"
+        }
+      },
+      "group": {
+        "title": "Group blinds together",
+        "description": "Members keep their individual sun tracking, sensor choices, direction, and limits. Group moves pause every member. Group resume enables automatic control for every member.",
+        "data": {
+          "name": "Name",
+          "members": "Blinds / shades in this group"
+        }
+      },
+      "settings": {
+        "title": "Ready to use",
+        "description": "Save now to use the defaults, or customize any section. Default daytime is 08:00–21:00, open by day and closed at night, with sun tracking. Automatic control starts OFF so you can review the target first.",
+        "menu_options": {
+          "finish": "Save settings",
+          "shade": "Blind and sun tracking",
+          "schedule": "Day and night",
+          "limits": "Normal and window-open limits",
+          "comfort": "Room light and outside temperature",
+          "manual": "Manual control and reset triggers"
+        }
+      },
+      "user": {
+        "title": "Better Cover",
+        "menu_options": {
+          "shade": "Add a blind or shade",
+          "group": "Group existing blinds"
+        }
+      }
+    },
+    "error": {
+      "use_original_cover": "Choose the original hardware cover. Use a Better Cover group to combine controllers.",
+      "invalid_limits": "Minimum opening must not exceed maximum opening.",
+      "same_times": "Day and night must start at different times.",
+      "position_required": "Choose a cover that supports percentage control for the selected lift or tilt channel.",
+      "already_configured": "This cover and control channel already have a controller.",
+      "invalid_light_thresholds": "Bright-again lux must be greater than dark lux.",
+      "invalid_slats": "Slat spacing must not exceed slat width.",
+      "temperature_pair": "Choose both outside temperature and thermostat sources, or leave both empty.",
+      "invalid_members": "Select at least one existing blind controller."
+    },
+    "abort": {
+      "no_members": "Add at least one blind or shade before creating a group."
+    }
+  }
+}
