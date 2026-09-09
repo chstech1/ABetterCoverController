@@ -50,7 +50,7 @@ SOURCES = {
 }
 ERRORS = {
     "invalid_limits": "Minimum opening must not exceed maximum opening. Change the other limit first.",
-    "same_times": "Daytime and nighttime must begin at different times.",
+    "same_times": "Daytime and nighttime must use different boundaries (different fixed times or different sun events).",
     "invalid_slats": "Slat spacing must not exceed slat width.",
     "invalid_light_thresholds": "Bright-again threshold must exceed the dark-room threshold.",
 }

@@ -19,4 +19,6 @@ with ZipFile(output, "w", ZIP_DEFLATED) as archive:
             archive.write(path, path.relative_to(root))
     archive.write(root / "README.md", "README.md")
     archive.write(root / "LICENSE", "LICENSE")
+    for path in sorted((root / "docs").glob("*.md")):
+        archive.write(path, path.relative_to(root))
 print(output)

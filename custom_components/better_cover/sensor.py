@@ -21,7 +21,15 @@ class StatusSensor(BetterEntity, SensorEntity):
     @property
     def extra_state_attributes(self):
         c = self.controller
+        schedule = getattr(c, "schedule", None)
         return {
+            "daytime_begins_today": schedule.day_start.isoformat()
+            if schedule and schedule.day_start
+            else None,
+            "nighttime_privacy_begins_today": schedule.night_start.isoformat()
+            if schedule and schedule.night_start
+            else None,
+            "schedule_is_daytime": schedule.is_day if schedule else None,
             "target_percent_open": c.target,
             "current_percent_open": c.position,
             "manual_paused_since": c.paused_at.isoformat() if c.paused_at else None,

@@ -1,6 +1,6 @@
 # Better Cover: every device setting explained
 
-This guide describes **v0.2.0**, using the exact labels on the Home Assistant device page. The defaults below are the integration's defaults, not a record of anyone's home configuration. Examples are illustrative.
+This guide describes **v0.3.0**, using the exact labels on the Home Assistant device page. The defaults below are the integration's defaults, not a record of anyone's home configuration. Examples are illustrative.
 
 Open **Settings → Devices & services → Devices → your Better Cover device**. Daily actions are under **Controls**, the reason for its behavior is under **Sensors**, and editable settings are under **Configuration**. Click an entity if you need its full control or attributes. Settings can also be added to a dashboard.
 
@@ -8,6 +8,7 @@ Contents:
 
 - [Start here](#start-here)
 - [Which rule wins?](#which-rule-wins)
+- [Copy an existing setup](#copy-an-existing-setup)
 - [Daily controls and Status](#daily-controls-and-status)
 - [Configuration settings, A–Z](#configuration-settings)
 - [Slat-only settings](#slat-only-settings)
@@ -29,7 +30,7 @@ For a first window:
 2. Set normal **Minimum opening** / **Maximum opening**. Decide whether full nighttime closure must be allowed.
 3. Select **Window contact sensor** and choose the window-open range if you have a contact.
 4. Set **Window direction**, **Window height**, and **Sunlight reach into room** (or the slat dimensions for tilt).
-5. Set day/night times and openings. Set **Morning reset** independently.
+5. Select fixed or solar day/night boundaries and set the openings. Set **Morning reset** independently.
 6. Add brightness, temperature, and occupancy sources only for the features you want. A threshold alone does not enable a feature without its source.
 7. Inspect **Status** and its target, then turn on **Automatic control**.
 
@@ -59,7 +60,23 @@ The requested position is then restricted to the **normal range**, or to the **w
 
 A daytime calculation with missing sun data normally waits instead of using rows 3–6. The dark-room rule can still apply without sun data, and window clearance can still be corrected. Night scheduling does not need sun data.
 
+The most recent day/night boundary determines the schedule, including across midnight. **Daytime begins at** and **Nighttime privacy begins at** select fixed or solar boundaries. Existing controllers default to Fixed time, preserving their schedules.
+
 Movement thresholds can delay or suppress a command even when Status shows a new target. Inputs trigger reevaluation, and a timer reevaluates every 30 seconds. Nighttime and morning reset are not guaranteed to command movement at the exact second shown on the clock.
+
+## Copy an existing setup
+
+1. Open **Settings → Devices & services → Add integration → Better Cover**.
+2. Choose **Copy an existing setup** and select the controller to copy.
+3. Enter the **New controller name**, select the **New hardware cover**, and set **Room occupancy sensor** for the new room. This sensor is prefilled from the original; keep, replace, or clear it.
+4. Select **Save settings**, or review/edit a settings section before saving.
+5. Open the new Better Cover device, check its window-specific values, then enable **Automatic control** when ready.
+
+For example, copying a dining-room controller to a family-room controller only requires a new name, the family-room hardware shade, and the family-room occupancy sensor if all other settings should match. The copy includes the latest device-page edits, fixed/solar schedules, all limits, temperature/brightness sources, and reset rules.
+
+**Direction, covered height/slat dimensions, inversion, and the window contact are also copied.** Keep them only if they are correct for the new window. Copying does not infer which sensors belong to the new room. A hardware cover/channel cannot have duplicate controllers; choose unused hardware or a different appropriate setup.
+
+The new controller has its own entities and saved settings. It starts with automatic control OFF and no manual pause. Group membership is not copied. Later changes to either controller do not synchronize with the other. Groups themselves are not offered as copy sources.
 
 ## Daily controls and Status
 
@@ -87,6 +104,9 @@ This is an explanation, not a switch. Open it to inspect its attributes:
 
 | Attribute | Meaning |
 |---|---|
+| `daytime_begins_today` | Today’s resolved daytime boundary as a timestamp with its UTC offset; empty if it cannot be calculated. |
+| `nighttime_privacy_begins_today` | Today’s resolved nighttime boundary, not necessarily the next future occurrence. |
+| `schedule_is_daytime` | Whether the most recent resolved boundary selected daytime; empty if the schedule cannot be resolved. |
 | `target_percent_open` | Current calculated, limit-adjusted target. It may be visible even while OFF or paused; it is not proof that a command was sent. |
 | `current_percent_open` | Hardware position translated to Better Cover's percent-open convention. |
 | `manual_paused_since` | When the last manual pause began; empty means no pause. |
@@ -128,9 +148,19 @@ If a blind supports both and you want both controlled, create one controller for
 
 Requires **Room brightness sensor**. Raise this threshold if you want the dark-room override to start at a brighter reading; lower it to require a darker room. Keep it below **Bright-again threshold**. Indoor lights and the blind's own movement can affect a room lux sensor: this measures room brightness, not cloud cover directly.
 
+### Daytime begins at
+
+**Default: Fixed time. Choices: Fixed time, Dawn, Sunrise, Sunset, Dusk.** Select what starts the daytime schedule. This works independently of the nighttime selector, so a fixed/solar combination is supported.
+
+**Dawn** is the beginning of civil morning twilight (sun approximately 6° below the horizon); **Sunrise** is the morning horizon crossing. **Sunset** is the evening horizon crossing; **Dusk** is the end of civil evening twilight. HA's configured location and time zone determine the actual times, recalculated for each local date. There is no additional sensor to configure.
+
+Example: Sunrise for daytime and Dusk for nighttime keeps the daytime rules eligible between those events. The sun-tracking calculation itself still requires direct sun; after sunset but before dusk, the normal no-direct-sun rule can use Daytime opening.
+
+When Fixed time is selected, use the **Daytime begins** clock field below. Otherwise that clock field is retained but ignored. Selecting an event does not clear a manual pause or bypass limits. If a required event does not occur that day (for example, polar conditions), normal positioning holds and Status says **Waiting for schedule boundaries**. Window-limit corrections can still apply. Identical solar choices for day and night are rejected; a resolved tie between different boundary types also holds rather than guessing.
+
 ### Daytime begins
 
-**Default: 08:00.** The local HA time at which daytime rules become eligible. Daytime continues until **Nighttime privacy begins**, excluding that ending instant. Schedules may cross midnight, but their two start times cannot be identical.
+**Default: 08:00. Used only when Daytime begins at = Fixed time.** The local HA time at which daytime rules become eligible. Daytime continues until **Nighttime privacy begins**, excluding that ending instant. Schedules may cross midnight. Two fixed boundaries cannot use the same time; inactive clock fields do not restrict solar choices.
 
 This is not necessarily an “open fully” time: manual pause, darkness, temperature, sun, and limits still decide the result. It is separate from **Morning reset**. A pause can remain active when daytime begins if the reset is later.
 
@@ -188,9 +218,15 @@ A separate, fixed two-minute motor-settling window also applies to ordinary auto
 
 It does not have to match **Daytime begins**. If reset is 07:00 and daytime begins at 08:00, a resumed controller can use the nighttime position until 08:00. A missed reset is caught up after a restart. Changing this time can immediately clear an existing pause if the newly applicable reset is later than the manual action and has already passed.
 
+### Nighttime privacy begins at
+
+**Default: Fixed time. Choices: Fixed time, Dawn, Sunrise, Sunset, Dusk.** Select what starts nighttime privacy. Choose Sunset to begin privacy around the evening horizon crossing, or Dusk to wait until civil twilight ends. Any of the four events is supported, including a reversed overnight daytime schedule.
+
+Use **Nighttime privacy begins** for the clock time only when this selector is Fixed time. Solar events track the changing date automatically. Day and night must not select the same event. Manual pauses and the applicable opening limits still take priority; changing this selector is not a resume action. See **Daytime begins at** for missing-event behavior.
+
 ### Nighttime privacy begins
 
-**Default: 21:00.** Starts the nighttime rule, which lasts until **Daytime begins**. Night requests **Nighttime privacy opening** regardless of brightness and temperature.
+**Default: 21:00. Used only when Nighttime privacy begins at = Fixed time.** Starts the nighttime rule, which lasts until **Daytime begins**. Night requests **Nighttime privacy opening** regardless of brightness and temperature.
 
 Limits still apply. An active manual pause still holds your manual choice until a resume event; this setting does not force the controller out of manual pause. Automatic control must be ON. Timing and minimum-movement filters still apply to ordinary night commands.
 

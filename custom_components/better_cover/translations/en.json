@@ -25,12 +25,14 @@
       },
       "schedule": {
         "title": "Day and night",
-        "description": "Nighttime privacy overrides brightness and temperature. A manual pause holds your chosen position until a resume event. Times use Home Assistant’s time zone.",
+        "description": "Choose Fixed time, Dawn, Sunrise, Sunset, or Dusk for each boundary. Clock fields are used only for Fixed time. Solar times follow your Home Assistant location and time zone. Dawn and dusk use civil twilight. Night privacy overrides light and temperature, but manual pauses and travel limits still apply.",
         "data": {
           "day_start": "Daytime begins",
           "night_start": "Nighttime privacy begins",
           "day_position": "Daytime / dark-room position (% open)",
-          "night_position": "Nighttime position (% open)"
+          "night_position": "Nighttime position (% open)",
+          "day_start_mode": "Daytime begins at",
+          "night_start_mode": "Nighttime privacy begins at"
         }
       },
       "limits": {
@@ -94,23 +96,42 @@
         "title": "Better Cover",
         "menu_options": {
           "shade": "Add a blind or shade",
-          "group": "Group existing blinds"
+          "group": "Group existing blinds",
+          "copy": "Copy an existing setup"
+        }
+      },
+      "copy": {
+        "title": "Copy an existing setup",
+        "description": "Copy the latest saved settings from an existing blind or shade. The new controller will be independent and automatic control will start off.",
+        "data": {
+          "source_entry": "Setup to copy"
+        }
+      },
+      "copy_target": {
+        "title": "Choose the new blind",
+        "description": "Choose a new name and hardware cover. The room occupancy sensor is prefilled from the original; keep it, replace it, or clear it. All other settings are copied, including window direction, height, inversion, and window contact. Review those for the new window before enabling automatic control.",
+        "data": {
+          "name": "New controller name",
+          "cover_entity": "New hardware cover",
+          "occupancy_entity": "Room occupancy sensor"
         }
       }
     },
     "error": {
       "use_original_cover": "Choose the original hardware cover. Use a Better Cover group to combine controllers.",
       "invalid_limits": "Minimum opening must not exceed maximum opening.",
-      "same_times": "Day and night must start at different times.",
+      "same_times": "Daytime and nighttime must use different boundaries: different fixed times or different sun events.",
       "position_required": "Choose a cover that supports percentage control for the selected lift or tilt channel.",
       "already_configured": "This cover and control channel already have a controller.",
       "invalid_light_thresholds": "Bright-again lux must be greater than dark lux.",
       "invalid_slats": "Slat spacing must not exceed slat width.",
       "temperature_pair": "Choose both outside temperature and thermostat sources, or leave both empty.",
-      "invalid_members": "Select at least one existing blind controller."
+      "invalid_members": "Select at least one existing blind controller.",
+      "invalid_copy_source": "That source controller no longer exists. Choose another."
     },
     "abort": {
-      "no_members": "Add at least one blind or shade before creating a group."
+      "no_members": "Add at least one blind or shade before creating a group.",
+      "no_copy_source": "Add a blind or shade before copying a setup."
     }
   },
   "options": {
@@ -138,12 +159,14 @@
       },
       "schedule": {
         "title": "Day and night",
-        "description": "Nighttime privacy overrides brightness and temperature. A manual pause holds your chosen position until a resume event. Times use Home Assistant’s time zone.",
+        "description": "Choose Fixed time, Dawn, Sunrise, Sunset, or Dusk for each boundary. Clock fields are used only for Fixed time. Solar times follow your Home Assistant location and time zone. Dawn and dusk use civil twilight. Night privacy overrides light and temperature, but manual pauses and travel limits still apply.",
         "data": {
           "day_start": "Daytime begins",
           "night_start": "Nighttime privacy begins",
           "day_position": "Daytime / dark-room position (% open)",
-          "night_position": "Nighttime position (% open)"
+          "night_position": "Nighttime position (% open)",
+          "day_start_mode": "Daytime begins at",
+          "night_start_mode": "Nighttime privacy begins at"
         }
       },
       "limits": {
@@ -214,7 +237,7 @@
     "error": {
       "use_original_cover": "Choose the original hardware cover. Use a Better Cover group to combine controllers.",
       "invalid_limits": "Minimum opening must not exceed maximum opening.",
-      "same_times": "Day and night must start at different times.",
+      "same_times": "Daytime and nighttime must use different boundaries: different fixed times or different sun events.",
       "position_required": "Choose a cover that supports percentage control for the selected lift or tilt channel.",
       "already_configured": "This cover and control channel already have a controller.",
       "invalid_light_thresholds": "Bright-again lux must be greater than dark lux.",

@@ -1,5 +1,7 @@
 """Small, guided setup and editable options."""
 
+from copy import deepcopy
+
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.components.cover import CoverEntityFeature
@@ -9,11 +11,19 @@ from homeassistant.helpers import selector
 
 from .const import DEFAULTS, DOMAIN
 from .logic import validate
+from .schedule import SCHEDULE_MODES
 
 STEPS = {
     "shade": ["name", "cover_entity", "control_type", "invert_position"],
     "sun": ["azimuth", "window_height", "sun_depth", "slat_width", "slat_spacing"],
-    "schedule": ["day_start", "night_start", "day_position", "night_position"],
+    "schedule": [
+        "day_start_mode",
+        "day_start",
+        "night_start_mode",
+        "night_start",
+        "day_position",
+        "night_position",
+    ],
     "limits": ["min_position", "max_position", "window_entity", "window_min", "window_max"],
     "comfort": [
         "light_entity",
@@ -68,6 +78,14 @@ def schema(step, values):
                 "occupancy_entity": "binary_sensor",
             }[key]
             field = selector.EntitySelector(selector.EntitySelectorConfig(domain=domain))
+        elif key in ("day_start_mode", "night_start_mode"):
+            field = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[
+                        {"value": value, "label": label} for label, value in SCHEDULE_MODES.items()
+                    ]
+                )
+            )
         elif key == "control_type":
             field = selector.SelectSelector(
                 selector.SelectSelectorConfig(
@@ -108,6 +126,30 @@ def schema(step, values):
     return vol.Schema(fields)
 
 
+def cover_error(hass, values, own_id=None):
+    entity_id = values["cover_entity"]
+    registered = er.async_get(hass).async_get(entity_id)
+    if registered and registered.platform == DOMAIN:
+        return "use_original_cover"
+    state = hass.states.get(entity_id)
+    feature = (
+        CoverEntityFeature.SET_TILT_POSITION
+        if values["control_type"] == "tilt"
+        else CoverEntityFeature.SET_POSITION
+    )
+    if state is None or not int(state.attributes.get("supported_features", 0)) & feature:
+        return "position_required"
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        data = entry.options or entry.data
+        if (
+            entry.entry_id != own_id
+            and data.get("cover_entity") == entity_id
+            and data.get("control_type", "position") == values["control_type"]
+        ):
+            return "already_configured"
+    return None
+
+
 class Wizard:
     """Shared setup steps."""
 
@@ -125,31 +167,14 @@ class Wizard:
             self._values.update(user_input)
             self._values = {**DEFAULTS, **self._values}
             if step == "shade":
-                entity_id = self._values["cover_entity"]
-                state = self.hass.states.get(entity_id)
-                if state is None or not int(state.attributes.get("supported_features", 0)) & (
-                    CoverEntityFeature.SET_TILT_POSITION
-                    if self._values["control_type"] == "tilt"
-                    else CoverEntityFeature.SET_POSITION
-                ):
-                    errors["base"] = "position_required"
-                registered = er.async_get(self.hass).async_get(entity_id)
-                if registered and registered.platform == DOMAIN:
-                    errors["base"] = "use_original_cover"
-                existing = self.hass.config_entries.async_entries(DOMAIN)
                 own_id = (
                     self.config_entry.entry_id
                     if isinstance(self, config_entries.OptionsFlow)
                     else None
                 )
-                if any(
-                    e.entry_id != own_id
-                    and (e.options or e.data).get("cover_entity") == entity_id
-                    and (e.options or e.data).get("control_type", "position")
-                    == self._values["control_type"]
-                    for e in existing
-                ):
-                    errors["base"] = "already_configured"
+                error = cover_error(self.hass, self._values, own_id)
+                if error:
+                    errors["base"] = error
             if step in ("sun", "schedule", "limits", "comfort"):
                 error = validate(self._values)
                 if error:
@@ -242,7 +267,76 @@ class BetterCoverFlow(Wizard, config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
-        return self.async_show_menu(step_id="user", menu_options=["shade", "group"])
+        return self.async_show_menu(step_id="user", menu_options=["shade", "copy", "group"])
+
+    async def async_step_copy(self, user_input=None):
+        entries = [
+            e
+            for e in self.hass.config_entries.async_entries(DOMAIN)
+            if e.data.get("kind") != "group"
+        ]
+        if not entries:
+            return self.async_abort(reason="no_copy_source")
+        errors = {}
+        if user_input is not None:
+            source = next((e for e in entries if e.entry_id == user_input["source_entry"]), None)
+            if source is None:
+                errors["base"] = "invalid_copy_source"
+            else:
+                self._values = {**DEFAULTS, **deepcopy(dict(source.options or source.data))}
+                self._values.pop("kind", None)
+                self._values.pop("members", None)
+                self._values["name"] = f"{self._values['name']} copy"
+                self._values.pop("cover_entity", None)
+                return await self.async_step_copy_target()
+        return self.async_show_form(
+            step_id="copy",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("source_entry"): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[
+                                {
+                                    "value": e.entry_id,
+                                    "label": f"{(e.options or e.data).get('name', e.title)} ({(e.options or e.data).get('cover_entity')})",
+                                }
+                                for e in entries
+                            ]
+                        )
+                    )
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_copy_target(self, user_input=None):
+        errors = {}
+        if user_input is not None:
+            values = {**self._values, **user_input}
+            if "occupancy_entity" not in user_input:
+                values.pop("occupancy_entity", None)
+            error = cover_error(self.hass, values)
+            if error:
+                errors["base"] = error
+            else:
+                self._values = values
+                return await self.async_step_settings()
+        fields = vol.Schema(
+            {
+                vol.Required("name", default=self._values["name"]): selector.TextSelector(),
+                vol.Required("cover_entity"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="cover")
+                ),
+                vol.Optional("occupancy_entity"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="binary_sensor")
+                ),
+            }
+        )
+        return self.async_show_form(
+            step_id="copy_target",
+            data_schema=self.add_suggested_values_to_schema(fields, self._values),
+            errors=errors,
+        )
 
     @staticmethod
     @callback

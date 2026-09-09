@@ -52,8 +52,11 @@ def decide(
     dark=False,
     temperature=None,
     indoor_target=None,
+    is_day=None,
 ):
-    if not daytime(now, config["day_start"], config["night_start"]):
+    if is_day is None:
+        is_day = daytime(now, config["day_start"], config["night_start"])
+    if not is_day:
         return Decision(clamp(config["night_position"], config, window_open), "Night schedule")
     if dark:
         return Decision(clamp(config["day_position"], config, window_open), "Room is dark")
@@ -95,7 +98,12 @@ def validate(config, require_temperature_pair=True):
         or config["window_min"] > config["window_max"]
     ):
         return "invalid_limits"
-    if time.fromisoformat(config["day_start"]) == time.fromisoformat(config["night_start"]):
+    day_mode = config.get("day_start_mode", "fixed")
+    night_mode = config.get("night_start_mode", "fixed")
+    if day_mode == night_mode and (
+        day_mode != "fixed"
+        or time.fromisoformat(config["day_start"]) == time.fromisoformat(config["night_start"])
+    ):
         return "same_times"
     if config.get("slat_spacing", 1) > config.get("slat_width", 1):
         return "invalid_slats"

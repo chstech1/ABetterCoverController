@@ -19,9 +19,21 @@ No YAML automation is needed. Initial setup is two screens. After setup, edit se
 
 Future tagged releases appear as updates in HACS. This is a custom repository, not a listing in the default HACS catalog.
 
+## Copy a setup to another blind
+
+Open **Settings → Devices & services → Add integration → Better Cover → Copy an existing setup**. Select the original controller, enter the new name and hardware cover, and choose the new room occupancy sensor. Keep the prefilled occupancy source to reuse it, or clear it to disable vacancy-based resume for the copy. Choose **Save settings** to finish, or review any section first.
+
+The copy uses the original's latest saved settings, including edits made on its device page. It is independent: later edits do not affect the original. It starts with automatic control OFF and no manual pause; group membership is not copied. Window direction, dimensions, contact sensor, and inversion are copied too, so review them for the new window before enabling automation.
+
+## Solar schedule choices
+
+On each device, **Daytime begins at** and **Nighttime privacy begins at** offer **Fixed time, Dawn, Sunrise, Sunset, and Dusk** independently. For example, choose Sunrise for daytime and Dusk for privacy. Dawn/dusk use civil twilight. Events are calculated daily from HA's location and time zone; no extra sensor is needed.
+
+The existing **Daytime begins** and **Nighttime privacy begins** clock fields apply only when their selector is **Fixed time**. Saved clock values are retained when switching to solar events. Existing installations remain on Fixed time until you change them. Status attributes show today's resolved boundaries. Morning reset remains a separate fixed time; manual pauses and window/travel limits retain their priority.
+
 ## Manual install
 
-1. Download `better-cover-0.2.0.zip` from [Releases](https://github.com/chstech1/ABetterCoverController/releases), or build it locally and extract it.
+1. Download `better-cover-0.3.0.zip` from [Releases](https://github.com/chstech1/ABetterCoverController/releases), or build it locally and extract it.
 2. Copy the included `custom_components/better_cover` folder into your Home Assistant configuration folder, producing `/config/custom_components/better_cover/manifest.json`.
 3. Restart Home Assistant.
 4. Open **Settings → Devices & services → Add integration → Better Cover**.
@@ -43,7 +55,8 @@ Open **Settings → Devices & services → Devices** and select your Better Cove
 |---|---|
 | Normal and window-open limits, daytime/nighttime/hot-weather positions | Number fields, all in percent open |
 | Window direction and sun geometry | Number fields with units; geometry matches lift or tilt |
-| Daytime start, nighttime privacy, morning reset | Time controls |
+| Daytime start and nighttime privacy | Fixed time / Dawn / Sunrise / Sunset / Dusk dropdowns, with saved clock fields for Fixed time |
+| Morning reset | Time control |
 | Lux thresholds, temperature deadband, vacancy duration, movement interval | Number fields |
 | Position inversion and window limits during manual pause | Switches |
 | Hardware cover, control channel, room light, outside temperature, thermostat, window contact, home presence, room occupancy | Dropdowns |
@@ -57,7 +70,7 @@ A group must keep at least one member. Select a member in its Add or Remove drop
 
 Use the device's normal edit/rename controls to change its displayed name. The integration setup remains available for creating new controllers and groups; its Configure menu is an alternative editor for the same saved settings, not a required workflow.
 
-Existing installations: update to **v0.2.0** in HACS and restart Home Assistant. The configuration entities are added to your existing Better Cover devices. Existing entries and settings remain; do not delete and recreate them. Version 0.1.0 also incorrectly classified Better Cover as a helper; updating fixes that classification.
+Existing installations: update to **v0.3.0** in HACS and restart Home Assistant. The configuration entities are added to your existing Better Cover devices. Existing entries and settings remain; do not delete and recreate them. Version 0.1.0 also incorrectly classified Better Cover as a helper; updating fixes that classification.
 
 ## Daily controls
 
@@ -93,7 +106,7 @@ When automatic control is on and not manually paused:
 5. **Cooler outside than the thermostat target:** use the daytime opening to admit sunlight.
 6. **Otherwise:** track the sun.
 
-The applicable normal/window-open range clamps the result. By default, night is 21:00–08:00, daytime opening is 100%, night opening is 0%, and moves smaller than 5% or more frequent than five minutes are skipped. A window limit can bypass these movement thresholds. Schedules may cross midnight and use Home Assistant's time zone.
+The applicable normal/window-open range clamps the result. By default, night is 21:00–08:00, daytime opening is 100%, night opening is 0%, and moves smaller than 5% or more frequent than five minutes are skipped. A window limit can bypass these movement thresholds. Schedules may cross midnight and use Home Assistant's time zone. Each boundary can be fixed or solar. If a selected sun event does not occur locally that day, normal positioning waits with a Status explanation; window-limit corrections can still apply.
 
 Temperature compares an outside sensor with a climate entity's target temperature, or a sensor containing your desired indoor temperature. For dual-setpoint thermostats it uses the upper target if a single target is absent. Fahrenheit and Celsius are converted to Home Assistant's units; the configurable deadband uses those units. Temperature rules apply when direct sun hits the window. Night privacy wins over these rules. A manual pause still holds your manual choice overnight until a resume event.
 

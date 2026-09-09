@@ -13,7 +13,8 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import TemperatureConverter
 
 from .const import DEFAULTS, DOMAIN
-from .logic import clamp, decide, device_position, limits, number
+from .logic import Decision, clamp, decide, device_position, limits, number
+from .schedule import resolve_schedule
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class Controller:
         self.dark = False
         self.reason = "Automatic control off"
         self.target = None
+        self.schedule = None
         self.last_sent = None
         self.expected = None
         self.moving_until = None
@@ -307,17 +309,23 @@ class Controller:
         await self.update_inputs(now)
         sun = self.hass.states.get("sun.sun")
         outside, indoor_target = self.temperatures()
-        decision = decide(
-            self.config,
-            dt_util.as_local(now).time(),
-            sun.attributes.get("elevation")
-            if sun and sun.state not in ("unknown", "unavailable")
-            else None,
-            sun.attributes.get("azimuth") if sun else None,
-            window_open=self.window_open,
-            dark=self.dark,
-            temperature=outside,
-            indoor_target=indoor_target,
+        self.schedule = resolve_schedule(self.hass, self.config, now)
+        decision = (
+            decide(
+                self.config,
+                dt_util.as_local(now).time(),
+                sun.attributes.get("elevation")
+                if sun and sun.state not in ("unknown", "unavailable")
+                else None,
+                sun.attributes.get("azimuth") if sun else None,
+                window_open=self.window_open,
+                dark=self.dark,
+                temperature=outside,
+                indoor_target=indoor_target,
+                is_day=self.schedule.is_day,
+            )
+            if self.schedule.is_day is not None
+            else Decision(None, "Waiting for schedule boundaries")
         )
         self.target = decision.position
         if not self.enabled:

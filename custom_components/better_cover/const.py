@@ -8,6 +8,8 @@ DEFAULTS = {
     "azimuth": 180,
     "window_height": 1.5,
     "sun_depth": 0.5,
+    "day_start_mode": "fixed",
+    "night_start_mode": "fixed",
     "day_start": "08:00:00",
     "night_start": "21:00:00",
     "day_position": 100,

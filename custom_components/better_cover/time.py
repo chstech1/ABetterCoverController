@@ -20,6 +20,13 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 class SettingTime(SettingEntity, TimeEntity):
     @property
+    def extra_state_attributes(self):
+        return {
+            "used_when": "Fixed time",
+            "active": self.saved.get(f"{self.key}_mode", "fixed") == "fixed",
+        }
+
+    @property
     def native_value(self):
         return time.fromisoformat(self.saved[self.key])
 

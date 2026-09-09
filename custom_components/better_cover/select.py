@@ -6,6 +6,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 from .const import DOMAIN
+from .schedule import SCHEDULE_MODES, SCHEDULE_SETTINGS
 from .settings import SOURCES, SettingEntity, update_settings
 
 NONE = "Not configured"
@@ -21,6 +22,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         async_add_entities(
             [SourceSelect(c, key, spec[0]) for key, spec in SOURCES.items()]
             + [ChannelSelect(c, "control_type", "Control channel")]
+            + [ScheduleSelect(c, key, name) for key, name in SCHEDULE_SETTINGS.items()]
         )
 
 
@@ -137,3 +139,16 @@ class MemberSelect(SettingEntity, SelectEntity):
         self.async_on_remove(
             async_dispatcher_connect(self.hass, f"{DOMAIN}_changed", self.async_write_ha_state)
         )
+
+
+class ScheduleSelect(SettingEntity, SelectEntity):
+    _attr_options = list(SCHEDULE_MODES)
+
+    @property
+    def current_option(self):
+        return next(
+            label for label, value in SCHEDULE_MODES.items() if value == self.saved[self.key]
+        )
+
+    async def async_select_option(self, option):
+        await self.write(SCHEDULE_MODES[option])

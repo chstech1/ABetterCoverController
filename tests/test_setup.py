@@ -159,7 +159,7 @@ async def test_device_configuration_entities(hass):
     owned = [e for e in registry.entities.values() if e.config_entry_id == entry.entry_id]
     assert len({e.device_id for e in owned}) == 1
     settings = [e for e in owned if e.entity_category == EntityCategory.CONFIG]
-    assert len(settings) == 29  # 16 numbers, 3 times, 2 switches, 8 selects
+    assert len(settings) == 31  # 16 numbers, 3 times, 2 switches, 10 selects
     c = hass.data[DOMAIN][entry.entry_id]
     hass.states.async_set("binary_sensor.occupied", "off")
     await hass.async_block_till_done()
@@ -339,3 +339,103 @@ async def test_group_device_add_and_remove(hass):
     )
     await hass.async_block_till_done()
     assert group.config["members"] == [entry.entry_id]
+
+
+async def test_device_solar_schedule_persists(hass):
+    entry = await add_shade(hass)
+    for entity, option in (
+        ("select.better_cover_daytime_begins_at", "Sunrise"),
+        ("select.better_cover_nighttime_privacy_begins_at", "Dusk"),
+    ):
+        await hass.services.async_call(
+            "select", "select_option", {"entity_id": entity, "option": option}, blocking=True
+        )
+    await hass.async_block_till_done()
+    c = hass.data[DOMAIN][entry.entry_id]
+    assert c.config["day_start_mode"] == "sunrise"
+    assert c.config["night_start_mode"] == "dusk"
+    assert c.config["day_start"] == "08:00:00"
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get("select.better_cover_daytime_begins_at").state == "Sunrise"
+    assert hass.states.get("time.better_cover_daytime_begins").attributes["active"] is False
+
+
+async def test_copy_latest_settings_independent(hass):
+    source = await add_shade(hass)
+    saved = {
+        **source.data,
+        "min_position": 30,
+        "azimuth": 255,
+        "occupancy_entity": "binary_sensor.old_room",
+        "day_start_mode": "dawn",
+        "night_start_mode": "dusk",
+        "window_entity": "binary_sensor.contact",
+    }
+    hass.config_entries.async_update_entry(source, options=saved)
+    await hass.async_block_till_done()
+    await hass.data[DOMAIN][source.entry_id].pause()
+    hass.states.async_set(
+        "cover.new_room", "open", {"supported_features": 255, "current_position": 100}
+    )
+    flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "copy"})
+    flow = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], {"source_entry": source.entry_id}
+    )
+    assert flow["step_id"] == "copy_target"
+    flow = await hass.config_entries.flow.async_configure(
+        flow["flow_id"],
+        {
+            "name": "Family Room",
+            "cover_entity": "cover.new_room",
+            "occupancy_entity": "binary_sensor.new_room",
+        },
+    )
+    assert flow["step_id"] == "settings"
+    flow = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], {"next_step_id": "finish"}
+    )
+    await hass.async_block_till_done()
+    new = flow["result"]
+    expected = {
+        **saved,
+        "name": "Family Room",
+        "cover_entity": "cover.new_room",
+        "occupancy_entity": "binary_sensor.new_room",
+    }
+    assert dict(new.data) == expected
+    c = hass.data[DOMAIN][new.entry_id]
+    assert not c.enabled and c.paused_at is None
+    assert new.entry_id != source.entry_id
+    hass.config_entries.async_update_entry(new, options={**new.data, "min_position": 10})
+    await hass.async_block_till_done()
+    assert hass.data[DOMAIN][source.entry_id].config["min_position"] == 30
+
+
+async def test_copy_rejects_duplicate_and_can_clear_occupancy(hass):
+    source = await add_shade(hass)
+    hass.config_entries.async_update_entry(
+        source, options={**source.data, "occupancy_entity": "binary_sensor.old"}
+    )
+    await hass.async_block_till_done()
+    flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    flow = await hass.config_entries.flow.async_configure(flow["flow_id"], {"next_step_id": "copy"})
+    flow = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], {"source_entry": source.entry_id}
+    )
+    flow = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], {"name": "Copy", "cover_entity": "cover.real"}
+    )
+    assert flow["errors"]["base"] == "already_configured"
+    hass.states.async_set(
+        "cover.other", "open", {"supported_features": 255, "current_position": 100}
+    )
+    flow = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], {"name": "Copy", "cover_entity": "cover.other"}
+    )
+    flow = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], {"next_step_id": "finish"}
+    )
+    await hass.async_block_till_done()
+    assert "occupancy_entity" not in flow["result"].data
