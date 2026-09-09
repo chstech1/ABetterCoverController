@@ -61,7 +61,7 @@
       },
       "manual": {
         "title": "Manual control and resume",
-        "description": "Manual moves pause sun and schedule control. Resume when everyone leaves, after continuous room vacancy, or at the morning reset. Turning Automatic control OFF stays off. Window-open limits can still act during a pause, but OFF disables automatic movement.",
+        "description": "Manual moves pause normal automation. Resume on house vacancy, room vacancy, or morning reset. Optional Forced close entity ON holds closed without a timeout, even with Automatic control OFF. Window-open limits ALWAYS remain in effect during forced close. Turn the source OFF to return to normal behavior.",
         "data": {
           "home_entity": "Anyone-home binary sensor (on means someone is home)",
           "occupancy_entity": "Room occupancy sensor (on means occupied)",
@@ -69,7 +69,8 @@
           "reset_time": "Morning reset time",
           "window_overrides_manual": "Enforce window-open limits during a manual pause",
           "min_change": "Minimum position change (%)",
-          "interval_minutes": "Minimum time between automatic moves (minutes)"
+          "interval_minutes": "Minimum time between automatic moves (minutes)",
+          "forced_close_entity": "Forced close entity (sleep-mode helper)"
         }
       },
       "group": {
@@ -82,7 +83,7 @@
       },
       "settings": {
         "title": "Ready to use",
-        "description": "Save now to use the defaults, or customize any section. Default daytime is 08:00–21:00, open by day and closed at night, with sun tracking. Automatic control starts OFF so you can review the target first.",
+        "description": "Save now or customize a section. Ordinary automatic control starts OFF. A configured Forced close entity that is already ON takes effect immediately, subject to window-open limits.",
         "menu_options": {
           "finish": "Save settings",
           "shade": "Blind and sun tracking",
@@ -109,7 +110,7 @@
       },
       "copy_target": {
         "title": "Choose the new blind",
-        "description": "Choose a new name and hardware cover. The room occupancy sensor is prefilled from the original; keep it, replace it, or clear it. All other settings are copied, including window direction, height, inversion, and window contact. Review those for the new window before enabling automatic control.",
+        "description": "Choose a new name and hardware cover. The room occupancy sensor is prefilled from the original; keep it, replace it, or clear it. All other settings are copied, including window direction, height, inversion, and window contact. Review those for the new window before enabling automatic control. A copied forced-close source also applies to the new controller, even while Automatic control is off.",
         "data": {
           "name": "New controller name",
           "cover_entity": "New hardware cover",
@@ -195,7 +196,7 @@
       },
       "manual": {
         "title": "Manual control and resume",
-        "description": "Manual moves pause sun and schedule control. Resume when everyone leaves, after continuous room vacancy, or at the morning reset. Turning Automatic control OFF stays off. Window-open limits can still act during a pause, but OFF disables automatic movement.",
+        "description": "Manual moves pause normal automation. Resume on house vacancy, room vacancy, or morning reset. Optional Forced close entity ON holds closed without a timeout, even with Automatic control OFF. Window-open limits ALWAYS remain in effect during forced close. Turn the source OFF to return to normal behavior.",
         "data": {
           "home_entity": "Anyone-home binary sensor (on means someone is home)",
           "occupancy_entity": "Room occupancy sensor (on means occupied)",
@@ -203,7 +204,8 @@
           "reset_time": "Morning reset time",
           "window_overrides_manual": "Enforce window-open limits during a manual pause",
           "min_change": "Minimum position change (%)",
-          "interval_minutes": "Minimum time between automatic moves (minutes)"
+          "interval_minutes": "Minimum time between automatic moves (minutes)",
+          "forced_close_entity": "Forced close entity (sleep-mode helper)"
         }
       },
       "group": {
@@ -216,7 +218,7 @@
       },
       "settings": {
         "title": "Ready to use",
-        "description": "Save now to use the defaults, or customize any section. Default daytime is 08:00–21:00, open by day and closed at night, with sun tracking. Automatic control starts OFF so you can review the target first.",
+        "description": "Save now or customize a section. Ordinary automatic control starts OFF. A configured Forced close entity that is already ON takes effect immediately, subject to window-open limits.",
         "menu_options": {
           "finish": "Save settings",
           "shade": "Blind and sun tracking",

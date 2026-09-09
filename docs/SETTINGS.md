@@ -1,6 +1,6 @@
 # Better Cover: every device setting explained
 
-This guide describes **v0.3.0**, using the exact labels on the Home Assistant device page. The defaults below are the integration's defaults, not a record of anyone's home configuration. Examples are illustrative.
+This guide describes **v0.4.0**, using the exact labels on the Home Assistant device page. The defaults below are the integration's defaults, not a record of anyone's home configuration. Examples are illustrative.
 
 Open **Settings → Devices & services → Devices → your Better Cover device**. Daily actions are under **Controls**, the reason for its behavior is under **Sensors**, and editable settings are under **Configuration**. Click an entity if you need its full control or attributes. Settings can also be added to a dashboard.
 
@@ -38,7 +38,9 @@ Routine setting changes preserve a manual pause. Changing the occupancy sensor s
 
 ## Which rule wins?
 
-First, the controller decides whether it may move:
+**Highest priority: window clearance during forced close.** An ON Forced close entity requests 0% when the window is closed, or the lowest opening allowed by the window-open range when open. It overrides the ordinary rules below without a timeout.
+
+When forced close is inactive, the controller decides whether it may move:
 
 | Condition | Result |
 |---|---|
@@ -76,19 +78,19 @@ For example, copying a dining-room controller to a family-room controller only r
 
 **Direction, covered height/slat dimensions, inversion, and the window contact are also copied.** Keep them only if they are correct for the new window. Copying does not infer which sensors belong to the new room. A hardware cover/channel cannot have duplicate controllers; choose unused hardware or a different appropriate setup.
 
-The new controller has its own entities and saved settings. It starts with automatic control OFF and no manual pause. Group membership is not copied. Later changes to either controller do not synchronize with the other. Groups themselves are not offered as copy sources.
+The new controller has its own entities and saved settings. It starts with ordinary automatic control OFF and no manual pause. A copied forced-close source that is ON still takes effect immediately, subject to window-open limits. Group membership is not copied. Later changes to either controller do not synchronize with the other. Groups themselves are not offered as copy sources.
 
 ## Daily controls and Status
 
 ### Automatic control
 
-**Initial default: OFF.** ON enables automatic decisions. OFF leaves the blind where it is and prevents further automatic commands; it does not close, open, or issue a stop command to an already-moving motor. Manual cover commands remain usable while OFF.
+**Initial default: OFF. An ON Forced close entity acts independently of this switch, with window-open limits preserved.** ON enables ordinary automatic decisions. OFF leaves the blind where it is and prevents further automatic commands; it does not close, open, or issue a stop command to an already-moving motor. Manual cover commands remain usable while OFF unless forced close is active.
 
 Turning this switch ON also clears a manual pause and reevaluates the target. Its enabled state survives HA restarts. Morning reset, vacancy, and leaving home clear pauses but **do not turn an explicitly disabled controller on**.
 
 ### Cover / Slats
 
-Use these controls for manual open, close, percentage, and supported stop actions. **Cover** controls raising/lowering; **Slats** controls tilt. Open requests 100%; close requests 0%; both obey the currently applicable limits. A manual action starts a pause so ordinary sun and schedule control will not immediately undo your choice.
+Use these controls for manual open, close, percentage, and supported stop actions when forced close is inactive. **Cover** controls raising/lowering; **Slats** controls tilt. Open requests 100%; close requests 0%; both obey the currently applicable limits. A manual action starts a pause so ordinary sun and schedule control will not immediately undo your choice.
 
 The original hardware entity bypasses Better Cover's clamping. Direct HA commands targeting that original entity are detected as manual actions. Physical remote movement is inferred from reported position changes. There is a two-minute settling window after Better Cover commands a motor; physical changes during that window may not be recognized if the motor omits command context. Use the Better Cover entity when explicit manual-override behavior matters.
 
@@ -107,6 +109,8 @@ This is an explanation, not a switch. Open it to inspect its attributes:
 | `daytime_begins_today` | Today’s resolved daytime boundary as a timestamp with its UTC offset; empty if it cannot be calculated. |
 | `nighttime_privacy_begins_today` | Today’s resolved nighttime boundary, not necessarily the next future occurrence. |
 | `schedule_is_daytime` | Whether the most recent resolved boundary selected daytime; empty if the schedule cannot be resolved. |
+| `forced_close_active` | Whether the configured source is currently ON (for a group, whether any member is forced closed). |
+| `forced_close_entity` | The configured sleep/forced-close source, if any. |
 | `target_percent_open` | Current calculated, limit-adjusted target. It may be visible even while OFF or paused; it is not proof that a command was sent. |
 | `current_percent_open` | Hardware position translated to Better Cover's percent-open convention. |
 | `manual_paused_since` | When the last manual pause began; empty means no pause. |
@@ -175,6 +179,20 @@ It is **not the maximum sun-tracking position**. For example, Daytime opening = 
 **Default: OFF.** Enable only when the original **Home Assistant hardware cover** reports 0% for physically open and 100% for physically closed. ON translates both reported positions and outgoing commands using `hardware percentage = 100 − percent open`.
 
 All other Better Cover settings still mean percent open. For example, with inversion ON, a requested 30% opening sends 70 to the hardware. With inversion OFF it sends 30. Do not invert merely because the manufacturer's phone app uses reversed percentages; inspect the original HA entity. Some hardware integrations already normalize them.
+
+### Forced close entity
+
+**Default: Not configured.** Choose an `input_boolean` helper (such as sleep mode), a `binary_sensor`, or a `switch`. A confirmed **on** state holds the blind closed for as long as it remains on—even for days. There is no timeout. Use the same source on each individual blind that should follow your sleep mode; group commands cannot override an active member's forced close.
+
+**Window-open limits always take priority.** If the contact is open, the forced target is 0% constrained to the window-open minimum/maximum. For example, a 50–100% window-open range holds the shade 50% open so it does not cover the open window. A missing/unavailable configured contact also uses this range. Once the contact reports closed, the forced target becomes 0% again. The normal (window-closed) minimum is bypassed by forced close; the window-open minimum is not.
+
+Forced close acts even if Automatic control is OFF, a manual pause is active, daytime/sunlight rules favor opening, or environmental data is missing. Neither morning reset nor vacancy nor Resume disables it. The Window limits override manual pause switch cannot disable window protection during forced close. Hardware still must be available and report its position; otherwise Status shows that it is waiting.
+
+Manual open/close/percentage/stop actions through Better Cover are blocked while the source is ON. External original-hardware commands cannot be blocked by this integration; when reported, the controller reasserts the forced target. It does not create a new manual pause for these attempts. Forced commands bypass ordinary movement size/interval thresholds, with duplicate in-progress commands still suppressed.
+
+Turn the source OFF to leave forced close, or select Not configured to unlink it. The saved Automatic control state is retained; if it was OFF, the blind stays in place rather than automatically reopening. Existing manual pauses are retained while forced close acts, but normal resume rules are evaluated on release and can clear an old pause. An enabled, unpaused controller returns to its normal target subject to ordinary movement filters.
+
+Unknown/unavailable/missing forced-close sources do not activate the rule. Better Cover never changes the source. After a restart it responds when that source reports ON. Copies inherit the configured source too, so they can enforce forced close immediately despite ordinary automatic control starting OFF.
 
 ### Hardware cover
 
@@ -310,7 +328,7 @@ This converts an allowable uncovered height into percent open. For the same sun 
 
 **Default: ON.** When a window-open range is active, Automatic control is ON, and the current opening is outside that range, the controller corrects it even during a manual pause.
 
-It moves only to the nearest allowed boundary for this pause correction. For an opening of 20% and window range 60–100%, it requests 60%, not the full sun target. The manual pause remains active. OFF prevents this automatic correction during a pause; it does **not** disable window limits for new manual commands sent through Better Cover. Automatic control OFF disables all automatic window corrections regardless of this switch.
+It moves only to the nearest allowed boundary for this pause correction. For an opening of 20% and window range 60–100%, it requests 60%, not the full sun target. The manual pause remains active. OFF prevents this automatic correction during a pause; it does **not** disable window limits for new manual commands sent through Better Cover. Automatic control OFF disables ordinary automatic window corrections. Active forced close still uses window-open limits regardless of this switch.
 
 ### Window-open maximum opening
 

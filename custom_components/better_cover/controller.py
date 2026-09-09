@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, time, timedelta
 
 from homeassistant.core import Context, callback
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.storage import Store
@@ -72,6 +72,16 @@ class Controller:
     def state(self, key):
         entity_id = self.config.get(key)
         return self.hass.states.get(entity_id) if entity_id else None
+
+    @property
+    def forced_closed(self):
+        state = self.state("forced_close_entity")
+        return state is not None and state.state == "on"
+
+    @property
+    def forced_close_target(self):
+        # Sleep may override ordinary positions, but never window clearance.
+        return clamp(0, self.config, True) if self.window_open else 0
 
     @property
     def window_open(self):
@@ -149,7 +159,11 @@ class Controller:
         if isinstance(targets, str):
             targets = [targets]
         if self.config["cover_entity"] in targets and event.context.id not in self.context_ids:
-            await self.pause()
+            if self.forced_closed:
+                self.expected = None
+                self.moving_until = None
+            else:
+                await self.pause()
             await self.evaluate()
 
     async def changed(self, event):
@@ -170,8 +184,30 @@ class Controller:
                     new.context.id in self.context_ids or new.context.parent_id in self.context_ids
                 )
                 settling = self.moving_until and dt_util.utcnow() < self.moving_until
-                if moved and not own and (new.context.user_id or not settling):
-                    await self.pause()
+                if moved and not own:
+                    if self.forced_closed:
+                        old_raw = number(old.attributes.get(self.position_attribute))
+                        new_raw = number(new.attributes.get(self.position_attribute))
+                        old_open = (
+                            device_position(old_raw, self.config["invert_position"])
+                            if old_raw is not None
+                            else None
+                        )
+                        new_open = (
+                            device_position(new_raw, self.config["invert_position"])
+                            if new_raw is not None
+                            else None
+                        )
+                        if (new.state == "opening" and self.forced_close_target == 0) or (
+                            old_open is not None
+                            and new_open is not None
+                            and abs(new_open - self.forced_close_target)
+                            > abs(old_open - self.forced_close_target)
+                        ):
+                            self.expected = None
+                            self.moving_until = None
+                    elif new.context.user_id or not settling:
+                        await self.pause()
         await self.evaluate()
 
     async def pause(self):
@@ -186,12 +222,20 @@ class Controller:
 
     async def manual(self, position):
         async with self.lock:
+            if self.forced_closed:
+                raise ServiceValidationError(
+                    "Forced close is active. Turn off the configured forced-close entity before using manual controls."
+                )
             await self.pause()
             await self.send(clamp(position, self.config, self.window_open))
         await self.evaluate()
 
     async def stop(self):
         async with self.lock:
+            if self.forced_closed:
+                raise ServiceValidationError(
+                    "Forced close is active. Turn off the configured forced-close entity before using manual controls."
+                )
             await self.pause()
             context = self.new_context()
             await self.hass.services.async_call(
@@ -209,6 +253,8 @@ class Controller:
         return context
 
     async def send(self, target):
+        if self.forced_closed:
+            target = self.forced_close_target
         if self.expected == target and self.moving_until and dt_util.utcnow() < self.moving_until:
             return
         context = self.new_context()
@@ -306,6 +352,16 @@ class Controller:
 
     async def _evaluate(self, force):
         now = dt_util.utcnow()
+        if self.forced_closed:
+            self.target = self.forced_close_target
+            self.reason = "Forced close active" + (
+                " · window-open limits" if self.window_open else ""
+            )
+            if not self.available:
+                self.reason += " · waiting for cover position"
+            elif self.position != self.target:
+                await self.send(self.target)
+            return
         await self.update_inputs(now)
         sun = self.hass.states.get("sun.sun")
         outside, indoor_target = self.temperatures()

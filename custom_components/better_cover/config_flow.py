@@ -35,6 +35,7 @@ STEPS = {
         "hot_position",
     ],
     "manual": [
+        "forced_close_entity",
         "home_entity",
         "occupancy_entity",
         "empty_hours",
@@ -55,6 +56,7 @@ def schema(step, values):
         ):
             continue
         optional = key in (
+            "forced_close_entity",
             "window_entity",
             "light_entity",
             "temperature_entity",
@@ -69,6 +71,7 @@ def schema(step, values):
         )
         if key.endswith("_entity"):
             domain = {
+                "forced_close_entity": ["input_boolean", "binary_sensor", "switch"],
                 "cover_entity": "cover",
                 "window_entity": "binary_sensor",
                 "light_entity": "sensor",

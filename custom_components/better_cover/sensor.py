@@ -30,6 +30,8 @@ class StatusSensor(BetterEntity, SensorEntity):
             if schedule and schedule.night_start
             else None,
             "schedule_is_daytime": schedule.is_day if schedule else None,
+            "forced_close_active": getattr(c, "forced_closed", False),
+            "forced_close_entity": c.config.get("forced_close_entity"),
             "target_percent_open": c.target,
             "current_percent_open": c.position,
             "manual_paused_since": c.paused_at.isoformat() if c.paused_at else None,

@@ -49,9 +49,15 @@ class GroupController:
         return any(c.window_open for c in self.members)
 
     @property
+    def forced_closed(self):
+        return any(c.forced_closed for c in self.members)
+
+    @property
     def reason(self):
         if not self.available:
             return "One or more members unavailable"
+        if self.forced_closed:
+            return "One or more members forced closed"
         if any(c.paused_at for c in self.members):
             return "One or more members manually paused"
         return "Automatic control on" if self.enabled else "Automatic control off or mixed"

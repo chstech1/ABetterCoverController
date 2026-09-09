@@ -159,7 +159,7 @@ async def test_device_configuration_entities(hass):
     owned = [e for e in registry.entities.values() if e.config_entry_id == entry.entry_id]
     assert len({e.device_id for e in owned}) == 1
     settings = [e for e in owned if e.entity_category == EntityCategory.CONFIG]
-    assert len(settings) == 31  # 16 numbers, 3 times, 2 switches, 10 selects
+    assert len(settings) == 32  # 16 numbers, 3 times, 2 switches, 11 selects
     c = hass.data[DOMAIN][entry.entry_id]
     hass.states.async_set("binary_sensor.occupied", "off")
     await hass.async_block_till_done()
@@ -439,3 +439,32 @@ async def test_copy_rejects_duplicate_and_can_clear_occupancy(hass):
     )
     await hass.async_block_till_done()
     assert "occupancy_entity" not in flow["result"].data
+
+
+async def test_sleep_helper_selection_and_reload(hass):
+    from unittest.mock import AsyncMock
+
+    entry = await add_shade(hass)
+    hass.states.async_set("input_boolean.sleep", "off")
+    await hass.async_block_till_done()
+    entity_id = "select.better_cover_forced_close_entity"
+    assert "input_boolean.sleep" in hass.states.get(entity_id).attributes["options"]
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": entity_id, "option": "input_boolean.sleep"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    assert entry.options["forced_close_entity"] == "input_boolean.sleep"
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    c = hass.data[DOMAIN][entry.entry_id]
+    c.send = AsyncMock()
+    hass.states.async_set("input_boolean.sleep", "on")
+    await hass.async_block_till_done()
+    c.send.assert_awaited_once_with(0)
+    assert not c.enabled and c.reason == "Forced close active"
+    hass.states.async_set("input_boolean.sleep", "off")
+    await hass.async_block_till_done()
+    assert not c.forced_closed and c.reason == "Automatic control off"

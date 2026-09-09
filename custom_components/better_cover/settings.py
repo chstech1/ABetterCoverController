@@ -40,6 +40,7 @@ SWITCHES = {
     "window_overrides_manual": "Window limits override manual pause",
 }
 SOURCES = {
+    "forced_close_entity": ("Forced close entity", ["input_boolean", "binary_sensor", "switch"]),
     "cover_entity": ("Hardware cover", ["cover"]),
     "window_entity": ("Window contact sensor", ["binary_sensor"]),
     "light_entity": ("Room brightness sensor", ["sensor"]),

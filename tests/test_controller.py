@@ -224,3 +224,164 @@ async def test_group_continues_after_one_member_fails(controller):
     with pytest.raises(HomeAssistantError):
         await group.manual(50)
     second.manual.assert_awaited_once_with(50)
+
+
+async def test_forced_close_preserves_window_limits_despite_off_pause_and_missing_sun(controller):
+    c = controller
+    c.config.update(
+        forced_close_entity="input_boolean.sleep",
+        min_position=70,
+        window_entity="binary_sensor.window",
+        window_min=90,
+    )
+    c.hass.states.async_set("input_boolean.sleep", "on")
+    c.hass.states.async_set("binary_sensor.window", "on")
+    c.hass.states.async_set("sun.sun", "unavailable")
+    await c.pause()
+    paused = c.paused_at
+    await c.evaluate()
+    assert c.calls[-1].data["position"] == 90
+    assert c.reason == "Forced close active · window-open limits" and c.target == 90
+    assert c.paused_at == paused and not c.enabled
+
+
+async def test_forced_close_has_no_timeout(controller):
+    c = controller
+    c.config["forced_close_entity"] = "input_boolean.sleep"
+    c.hass.states.async_set("input_boolean.sleep", "on")
+    c.paused_at = dt_util.utcnow() - timedelta(days=5)
+    c.empty_since = dt_util.utcnow() - timedelta(days=5)
+    paused = c.paused_at
+    await c.evaluate()
+    assert c.forced_closed and c.paused_at == paused
+    await c.set_enabled(True)
+    assert c.forced_closed and c.target == 0
+
+
+async def test_forced_close_blocks_manual_and_stop(controller):
+    from homeassistant.exceptions import ServiceValidationError
+
+    c = controller
+    c.config["forced_close_entity"] = "input_boolean.sleep"
+    c.hass.states.async_set("input_boolean.sleep", "on")
+    with pytest.raises(ServiceValidationError, match="Forced close"):
+        await c.manual(100)
+    with pytest.raises(ServiceValidationError, match="Forced close"):
+        await c.stop()
+    assert c.paused_at is None
+
+
+async def test_forced_close_release_restores_disabled_state(controller):
+    c = controller
+    c.config["forced_close_entity"] = "input_boolean.sleep"
+    c.hass.states.async_set("input_boolean.sleep", "on")
+    await c.evaluate()
+    c.hass.states.async_set("cover.test", "closed", {"current_position": 0})
+    c.hass.states.async_set("input_boolean.sleep", "off")
+    await c.evaluate()
+    assert c.reason == "Automatic control off" and not c.enabled
+    assert len(c.calls) == 1
+
+
+async def test_forced_close_inverted_tilt(controller):
+    c = controller
+    c.config.update(
+        control_type="tilt", invert_position=True, forced_close_entity="binary_sensor.sleep"
+    )
+    c.hass.states.async_set("cover.test", "open", {"current_tilt_position": 0})
+    c.hass.states.async_set("binary_sensor.sleep", "on")
+    await c.evaluate()
+    assert c.calls[-1].service == "set_cover_tilt_position"
+    assert c.calls[-1].data["tilt_position"] == 100
+
+
+async def test_external_open_recloses_during_settling(controller):
+    c = controller
+    c.config["forced_close_entity"] = "input_boolean.sleep"
+    c.hass.states.async_set("input_boolean.sleep", "on")
+    await c.evaluate()
+    data = {"domain": "cover", "service": "open_cover", "service_data": {"entity_id": "cover.test"}}
+    await c.service_called(Event("call_service", data, context=Context()))
+    assert len(c.calls) == 2 and c.calls[-1].data["position"] == 0
+    assert c.paused_at is None
+
+
+async def test_physical_reopen_recloses(controller):
+    c = controller
+    c.config["forced_close_entity"] = "input_boolean.sleep"
+    c.hass.states.async_set("input_boolean.sleep", "on")
+    await c.evaluate()
+    c.hass.states.async_set("cover.test", "closed", {"current_position": 0})
+    old = c.source
+    c.hass.states.async_set("cover.test", "opening", {"current_position": 20})
+    await c.changed(
+        Event("state_changed", {"entity_id": "cover.test", "old_state": old, "new_state": c.source})
+    )
+    assert len(c.calls) == 2 and c.calls[-1].data["position"] == 0
+
+
+@pytest.mark.parametrize("state", ["off", "unknown", "unavailable"])
+async def test_forced_close_only_on_activates(controller, state):
+    c = controller
+    c.config["forced_close_entity"] = "input_boolean.sleep"
+    c.hass.states.async_set("input_boolean.sleep", state)
+    await c.evaluate()
+    assert not c.forced_closed and not c.calls
+
+
+async def test_forced_close_follows_window_open_and_closed(controller):
+    c = controller
+    c.config.update(
+        forced_close_entity="input_boolean.sleep",
+        window_entity="binary_sensor.window",
+        window_min=60,
+        min_position=30,
+    )
+    c.hass.states.async_set("input_boolean.sleep", "on")
+    c.hass.states.async_set("binary_sensor.window", "off")
+    await c.evaluate()
+    assert c.calls[-1].data["position"] == 0
+    c.hass.states.async_set("cover.test", "closed", {"current_position": 0})
+    c.hass.states.async_set("binary_sensor.window", "on")
+    await c.evaluate()
+    assert c.calls[-1].data["position"] == 60
+    c.hass.states.async_set("cover.test", "open", {"current_position": 60})
+    c.hass.states.async_set("binary_sensor.window", "off")
+    await c.evaluate()
+    assert c.calls[-1].data["position"] == 0
+
+
+async def test_forced_close_unavailable_contact_and_inversion(controller):
+    c = controller
+    c.config.update(
+        forced_close_entity="input_boolean.sleep",
+        window_entity="binary_sensor.missing",
+        window_min=65,
+        invert_position=True,
+    )
+    c.hass.states.async_set("input_boolean.sleep", "on")
+    c.hass.states.async_set("cover.test", "closed", {"current_position": 100})
+    await c.evaluate()
+    assert c.target == 65
+    assert c.calls[-1].data["position"] == 35
+
+
+async def test_forced_close_corrects_external_close_below_window_minimum(controller):
+    c = controller
+    c.config.update(
+        forced_close_entity="input_boolean.sleep",
+        window_entity="binary_sensor.window",
+        window_min=60,
+        window_overrides_manual=False,
+    )
+    c.hass.states.async_set("input_boolean.sleep", "on")
+    c.hass.states.async_set("binary_sensor.window", "on")
+    await c.evaluate()
+    c.hass.states.async_set("cover.test", "open", {"current_position": 60})
+    old = c.source
+    c.hass.states.async_set("cover.test", "closing", {"current_position": 30})
+    await c.changed(
+        Event("state_changed", {"entity_id": "cover.test", "old_state": old, "new_state": c.source})
+    )
+    assert len(c.calls) == 2
+    assert c.calls[-1].data["position"] == 60

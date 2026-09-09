@@ -19,6 +19,16 @@ No YAML automation is needed. Initial setup is two screens. After setup, edit se
 
 Future tagged releases appear as updates in HACS. This is a custom repository, not a listing in the default HACS catalog.
 
+## Sleep mode / forced close
+
+On each blind's device page, set **Forced close entity** to your sleep helper (`input_boolean`), binary sensor, or switch. Select the same helper on multiple blinds if they should all follow it.
+
+While the source is **ON**, Better Cover requests full closure indefinitely—even with Automatic control OFF or a manual pause active. **Window-open limits ALWAYS win:** with an open window and a 60% window-open minimum, it holds at 60% open instead of closing across the window. A configured but unavailable contact also uses that protective range. Closing the window allows full closure again. Ordinary normal-range minimums are bypassed for forced close; the separate window-open range is never bypassed.
+
+Manual cover commands through Better Cover are blocked until the source turns OFF. External hardware movement is corrected when reported. Turning the source OFF returns to the saved automatic/manual behavior; an OFF automatic controller stays OFF. Normal resume rules may then clear an older manual pause. There is no duration setting or automatic timeout, and Better Cover never toggles the source helper. Unknown/unavailable forced-close sources are not treated as ON.
+
+This works after restart whenever the configured source reports ON. A copied controller also inherits this source and can therefore enforce it immediately even though ordinary Automatic control starts OFF.
+
 ## Copy a setup to another blind
 
 Open **Settings → Devices & services → Add integration → Better Cover → Copy an existing setup**. Select the original controller, enter the new name and hardware cover, and choose the new room occupancy sensor. Keep the prefilled occupancy source to reuse it, or clear it to disable vacancy-based resume for the copy. Choose **Save settings** to finish, or review any section first.
@@ -33,7 +43,7 @@ The existing **Daytime begins** and **Nighttime privacy begins** clock fields ap
 
 ## Manual install
 
-1. Download `better-cover-0.3.0.zip` from [Releases](https://github.com/chstech1/ABetterCoverController/releases), or build it locally and extract it.
+1. Download `better-cover-0.4.0.zip` from [Releases](https://github.com/chstech1/ABetterCoverController/releases), or build it locally and extract it.
 2. Copy the included `custom_components/better_cover` folder into your Home Assistant configuration folder, producing `/config/custom_components/better_cover/manifest.json`.
 3. Restart Home Assistant.
 4. Open **Settings → Devices & services → Add integration → Better Cover**.
@@ -70,7 +80,7 @@ A group must keep at least one member. Select a member in its Add or Remove drop
 
 Use the device's normal edit/rename controls to change its displayed name. The integration setup remains available for creating new controllers and groups; its Configure menu is an alternative editor for the same saved settings, not a required workflow.
 
-Existing installations: update to **v0.3.0** in HACS and restart Home Assistant. The configuration entities are added to your existing Better Cover devices. Existing entries and settings remain; do not delete and recreate them. Version 0.1.0 also incorrectly classified Better Cover as a helper; updating fixes that classification.
+Existing installations: update to **v0.4.0** in HACS and restart Home Assistant. The configuration entities are added to your existing Better Cover devices. Existing entries and settings remain; do not delete and recreate them. Version 0.1.0 also incorrectly classified Better Cover as a helper; updating fixes that classification.
 
 ## Daily controls
 
@@ -91,11 +101,13 @@ All settings mean **percent open**: 0 is fully closed, 100 is fully open. Enable
 
 Each controller has a normal minimum/maximum and a separate window-open minimum/maximum. The window-open range **replaces** the normal range. For example, normal 0–80 and window-open 60–100 lets the shade close to 0 normally but keeps it at least 60% open when the contact is on.
 
-A missing or unavailable configured contact uses the window-open range. By default this range is enforced during manual pauses, moving only as far as needed to enter the allowed range. Turning **Automatic control OFF** disables automatic enforcement too. This is software positioning, not a motor interlock: commands issued directly to hardware can still move outside these limits before the controller detects the move.
+A missing or unavailable configured contact uses the window-open range. By default this range is enforced during manual pauses, moving only as far as needed to enter the allowed range. Turning **Automatic control OFF** disables ordinary automatic enforcement. An active forced-close source still acts and always honors the window-open range. This is software positioning, not a motor interlock: commands issued directly to hardware can still move outside these limits before the controller detects the move.
 
 For tilt controllers these are slat-opening limits, not shade-height limits. If a blind has both lift and tilt, add it twice with different control channels and configure its lift controller for physical window clearance.
 
 ## The positioning rules
+
+An ON **Forced close entity** overrides the ordinary rules below, but always preserves window-open limits.
 
 When automatic control is on and not manually paused:
 
