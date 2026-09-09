@@ -2,7 +2,9 @@
 
 A small Home Assistant custom integration for existing SmartWings, IKEA, and other covers that support percentage positioning. It controls shades and slats using sun direction, time of day, room brightness, and outside temperature. Every blind has its own settings; groups provide shared controls.
 
-No YAML automation is needed. Initial setup is two screens. Extra settings live in a menu so you can configure only what you use.
+No YAML automation is needed. Initial setup is two screens. After setup, edit settings directly on each Better Cover device.
+
+**[Read the complete device settings guide](docs/SETTINGS.md)** — every setting by its exact Home Assistant label, defaults, examples, rule priorities, and troubleshooting.
 
 ## Install with HACS
 
@@ -32,6 +34,8 @@ The new controller starts with automatic movement OFF. After you turn it on, its
 Tested with Home Assistant **2026.2.3 / Python 3.13**. Hardware behavior still needs verification on your installation.
 
 ## Configure directly from the device
+
+For a field-by-field explanation, see **[Every device setting explained](docs/SETTINGS.md)**.
 
 Open **Settings → Devices & services → Devices** and select your Better Cover blind or group. Its **Configuration** section contains editable entities. You can also add these entities to any dashboard.
 
