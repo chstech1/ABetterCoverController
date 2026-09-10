@@ -58,6 +58,8 @@ def decide(
         is_day = daytime(now, config["day_start"], config["night_start"])
     if not is_day:
         return Decision(clamp(config["night_position"], config, window_open), "Night schedule")
+    if config.get("positioning_mode") == "schedule_only":
+        return Decision(clamp(config["day_position"], config, window_open), "Day schedule")
     if dark:
         return Decision(clamp(config["day_position"], config, window_open), "Room is dark")
     elevation, azimuth = number(elevation), number(azimuth)

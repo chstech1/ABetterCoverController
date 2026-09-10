@@ -66,6 +66,7 @@ Open **Settings → Devices & services → Devices** and select your Better Cove
 | Normal and window-open limits, daytime/nighttime/hot-weather positions | Number fields, all in percent open |
 | Window direction and sun geometry | Number fields with units; geometry matches lift or tilt |
 | Daytime start and nighttime privacy | Fixed time / Dawn / Sunrise / Sunset / Dusk dropdowns, with saved clock fields for Fixed time |
+| Positioning mode | Sun tracking / Schedule only dropdown |
 | Morning reset | Time control |
 | Lux thresholds, temperature deadband, vacancy duration, movement interval | Number fields |
 | Position inversion and window limits during manual pause | Switches |
@@ -80,20 +81,28 @@ A group must keep at least one member. Select a member in its Add or Remove drop
 
 Use the device's normal edit/rename controls to change its displayed name. The integration setup remains available for creating new controllers and groups; its Configure menu is an alternative editor for the same saved settings, not a required workflow.
 
-Existing installations: update to **v0.4.0** in HACS and restart Home Assistant. The configuration entities are added to your existing Better Cover devices. Existing entries and settings remain; do not delete and recreate them. Version 0.1.0 also incorrectly classified Better Cover as a helper; updating fixes that classification.
+Existing installations: update to **v0.5.0** in HACS and restart Home Assistant. The configuration entities are added to your existing Better Cover devices. Existing entries and settings remain; do not delete and recreate them. Version 0.1.0 also incorrectly classified Better Cover as a helper; updating fixes that classification.
 
 ## Daily controls
 
-Each controller has four daily-control entities, plus its configuration entities:
+Each controller has six daily-control entities, plus its configuration entities:
 
 | Control | What it does |
 |---|---|
 | Cover / Slats | Open, close, or set a percentage manually; honors limits and pauses automation |
 | Automatic control | ON enables automation; OFF stops automatic commands until you turn it on |
+| Manual mode | Binary sensor: ON while manually paused; groups show ON if any member is paused |
+| Recalculate and move | One-time move to the current automatic target, preserving pause and enabled state; honors forced close and window limits |
 | Resume automatic control | Clears the manual pause and turns automation on immediately |
 | Status | Shows the current reason and attributes including target, current opening, pause, and window state |
 
 Use the new Cover / Slats entity in dashboards and automations. The original hardware cover remains available, but direct hardware commands bypass this integration's clamping. Direct entity-targeted HA cover commands are detected as manual actions, and physical moves are detected from position reports when possible.
+
+## Open at dawn, close at dusk, and obey sleep mode
+
+On the device, choose **Positioning mode → Schedule only**, **Daytime begins at → Dawn**, **Daytime opening → 100%**, **Nighttime privacy begins at → Dusk**, and **Nighttime privacy opening → 0%**. Set the normal range to **0–100%**, retain your window contact and clearance limits, choose your sleep helper under **Forced close entity**, and turn **Automatic control ON**.
+
+This ignores brightness, temperature, and sun geometry. Sleep ON keeps requesting closure without a timeout; an open window still limits how far the shade closes. Manual changes still pause scheduled movement, and dusk does not clear that pause. See the [complete setup and behavior](docs/SETTINGS.md#dawndusk-and-sleep-only).
 
 ## Percentages and limits
 

@@ -70,7 +70,7 @@ async def test_full_setup_group_options_and_unload(hass):
             )
         )
     ]
-    assert len(states) == 6
+    assert len(states) == 7
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"next_step_id": "group"}
@@ -159,7 +159,7 @@ async def test_device_configuration_entities(hass):
     owned = [e for e in registry.entities.values() if e.config_entry_id == entry.entry_id]
     assert len({e.device_id for e in owned}) == 1
     settings = [e for e in owned if e.entity_category == EntityCategory.CONFIG]
-    assert len(settings) == 32  # 16 numbers, 3 times, 2 switches, 11 selects
+    assert len(settings) == 33  # 16 numbers, 3 times, 2 switches, 12 selects
     c = hass.data[DOMAIN][entry.entry_id]
     hass.states.async_set("binary_sensor.occupied", "off")
     await hass.async_block_till_done()
@@ -463,8 +463,37 @@ async def test_sleep_helper_selection_and_reload(hass):
     c.send = AsyncMock()
     hass.states.async_set("input_boolean.sleep", "on")
     await hass.async_block_till_done()
-    c.send.assert_awaited_once_with(0)
+    c.send.assert_awaited_once_with(0, force=False)
     assert not c.enabled and c.reason == "Forced close active"
     hass.states.async_set("input_boolean.sleep", "off")
     await hass.async_block_till_done()
     assert not c.forced_closed and c.reason == "Automatic control off"
+
+
+async def test_manual_indicator_button_and_positioning_mode(hass):
+    from unittest.mock import AsyncMock
+
+    entry = await add_shade(hass)
+    c = hass.data[DOMAIN][entry.entry_id]
+    assert hass.states.get("binary_sensor.better_cover_manual_mode").state == "off"
+    await c.pause()
+    c.publish()
+    await hass.async_block_till_done()
+    assert hass.states.get("binary_sensor.better_cover_manual_mode").state == "on"
+    c.recalculate = AsyncMock()
+    await hass.services.async_call(
+        "button", "press", {"entity_id": "button.better_cover_recalculate_and_move"}, blocking=True
+    )
+    c.recalculate.assert_awaited_once()
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": "select.better_cover_positioning_mode", "option": "Schedule only"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    assert c.config["positioning_mode"] == "schedule_only"
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get("select.better_cover_positioning_mode").state == "Schedule only"
+    assert hass.states.get("binary_sensor.better_cover_manual_mode").state == "on"

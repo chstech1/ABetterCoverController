@@ -25,14 +25,15 @@
       },
       "schedule": {
         "title": "Day and night",
-        "description": "Choose Fixed time, Dawn, Sunrise, Sunset, or Dusk for each boundary. Clock fields are used only for Fixed time. Solar times follow your Home Assistant location and time zone. Dawn and dusk use civil twilight. Night privacy overrides light and temperature, but manual pauses and travel limits still apply.",
+        "description": "Choose Fixed time, Dawn, Sunrise, Sunset, or Dusk for each boundary. Clock fields are used only for Fixed time. Solar times follow your Home Assistant location and time zone. Dawn and dusk use civil twilight. Night privacy overrides light and temperature, but manual pauses and travel limits still apply. Schedule only uses the daytime and nighttime positions without sun, brightness, or temperature adjustments.",
         "data": {
           "day_start": "Daytime begins",
           "night_start": "Nighttime privacy begins",
           "day_position": "Daytime / dark-room position (% open)",
           "night_position": "Nighttime position (% open)",
           "day_start_mode": "Daytime begins at",
-          "night_start_mode": "Nighttime privacy begins at"
+          "night_start_mode": "Nighttime privacy begins at",
+          "positioning_mode": "Positioning mode"
         }
       },
       "limits": {
@@ -160,14 +161,15 @@
       },
       "schedule": {
         "title": "Day and night",
-        "description": "Choose Fixed time, Dawn, Sunrise, Sunset, or Dusk for each boundary. Clock fields are used only for Fixed time. Solar times follow your Home Assistant location and time zone. Dawn and dusk use civil twilight. Night privacy overrides light and temperature, but manual pauses and travel limits still apply.",
+        "description": "Choose Fixed time, Dawn, Sunrise, Sunset, or Dusk for each boundary. Clock fields are used only for Fixed time. Solar times follow your Home Assistant location and time zone. Dawn and dusk use civil twilight. Night privacy overrides light and temperature, but manual pauses and travel limits still apply. Schedule only uses the daytime and nighttime positions without sun, brightness, or temperature adjustments.",
         "data": {
           "day_start": "Daytime begins",
           "night_start": "Nighttime privacy begins",
           "day_position": "Daytime / dark-room position (% open)",
           "night_position": "Nighttime position (% open)",
           "day_start_mode": "Daytime begins at",
-          "night_start_mode": "Nighttime privacy begins at"
+          "night_start_mode": "Nighttime privacy begins at",
+          "positioning_mode": "Positioning mode"
         }
       },
       "limits": {

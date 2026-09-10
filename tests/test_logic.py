@@ -69,3 +69,25 @@ def test_validation():
     assert validate(config(slat_spacing=30)) == "invalid_slats"
     assert validate(config(temperature_entity="sensor.outdoor")) == "temperature_pair"
     assert validate(config(dark_lux=300)) == "invalid_light_thresholds"
+
+
+def test_schedule_only_ignores_environment_and_respects_limits():
+    config = {**DEFAULTS, "positioning_mode": "schedule_only"}
+    for elevation, azimuth, dark, temperature in [
+        (None, None, False, None),
+        (45, 180, True, 90),
+        (45, 180, False, 90),
+    ]:
+        result = decide(
+            config,
+            time(12),
+            elevation,
+            azimuth,
+            dark=dark,
+            temperature=temperature,
+            indoor_target=70,
+            is_day=True,
+        )
+        assert result.position == 100 and result.reason == "Day schedule"
+    assert decide(config, time(22), None, None, is_day=False).position == 0
+    assert decide(config, time(22), None, None, is_day=False, window_open=True).position == 50

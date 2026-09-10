@@ -385,3 +385,60 @@ async def test_forced_close_corrects_external_close_below_window_minimum(control
     )
     assert len(c.calls) == 2
     assert c.calls[-1].data["position"] == 60
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+async def test_recalculate_preserves_pause_and_bypasses_filters(controller, enabled):
+    c = controller
+    c.enabled = enabled
+    c.config.update(positioning_mode="schedule_only", day_position=99, night_position=99)
+    await c.pause()
+    paused = c.paused_at
+    c.last_sent = dt_util.utcnow()
+    c.expected = 99
+    c.moving_until = c.last_sent + timedelta(minutes=2)
+    await c.recalculate()
+    assert c.calls[-1].data["position"] == 99
+    assert c.paused_at == paused and c.enabled == enabled and c.manual_mode
+    await c.recalculate()
+    assert len(c.calls) == 2
+
+
+async def test_recalculate_forced_close_window_tilt_inversion(controller):
+    c = controller
+    c.config.update(
+        control_type="tilt",
+        invert_position=True,
+        forced_close_entity="input_boolean.sleep",
+        window_entity="binary_sensor.window",
+        window_min=60,
+    )
+    c.hass.states.async_set("cover.test", "open", {"current_tilt_position": 0})
+    c.hass.states.async_set("input_boolean.sleep", "on")
+    c.hass.states.async_set("binary_sensor.window", "on")
+    await c.pause()
+    paused = c.paused_at
+    await c.recalculate()
+    assert c.calls[-1].service == "set_cover_tilt_position"
+    assert c.calls[-1].data["tilt_position"] == 40
+    assert c.paused_at == paused
+
+
+async def test_group_manual_indicator_and_recalculate(controller):
+    c = controller
+    group = GroupController(c.hass, SimpleNamespace(data={"members": ["test"]}, options={}))
+    c.hass.data[DOMAIN] = {"test": c}
+    assert not group.manual_mode
+    await c.pause()
+    assert group.manual_mode
+    await group.recalculate()
+    assert c.calls and c.manual_mode and not c.enabled
+
+
+async def test_recalculate_reports_command_failure(controller):
+    c = controller
+    c.send = AsyncMock(side_effect=HomeAssistantError("Motor failed"))
+    await c.pause()
+    with pytest.raises(HomeAssistantError, match="Motor failed"):
+        await c.recalculate()
+    assert c.manual_mode and c.reason == "Cover command failed"

@@ -5,7 +5,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
-from .const import DOMAIN
+from .const import DOMAIN, POSITIONING_MODES
 from .schedule import SCHEDULE_MODES, SCHEDULE_SETTINGS
 from .settings import SOURCES, SettingEntity, update_settings
 
@@ -22,6 +22,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         async_add_entities(
             [SourceSelect(c, key, spec[0]) for key, spec in SOURCES.items()]
             + [ChannelSelect(c, "control_type", "Control channel")]
+            + [PositioningSelect(c, "positioning_mode", "Positioning mode")]
             + [ScheduleSelect(c, key, name) for key, name in SCHEDULE_SETTINGS.items()]
         )
 
@@ -152,3 +153,16 @@ class ScheduleSelect(SettingEntity, SelectEntity):
 
     async def async_select_option(self, option):
         await self.write(SCHEDULE_MODES[option])
+
+
+class PositioningSelect(SettingEntity, SelectEntity):
+    _attr_options = list(POSITIONING_MODES)
+
+    @property
+    def current_option(self):
+        return next(
+            label for label, value in POSITIONING_MODES.items() if value == self.saved[self.key]
+        )
+
+    async def async_select_option(self, option):
+        await self.write(POSITIONING_MODES[option])

@@ -4,7 +4,7 @@ from .const import DOMAIN
 from .controller import Controller
 from .group import GroupController
 
-PLATFORMS = ["cover", "switch", "sensor", "button", "number", "time", "select"]
+PLATFORMS = ["binary_sensor", "cover", "switch", "sensor", "button", "number", "time", "select"]
 
 
 async def async_setup_entry(hass, entry):

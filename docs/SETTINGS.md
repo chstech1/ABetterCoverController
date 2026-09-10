@@ -1,6 +1,6 @@
 # Better Cover: every device setting explained
 
-This guide describes **v0.4.0**, using the exact labels on the Home Assistant device page. The defaults below are the integration's defaults, not a record of anyone's home configuration. Examples are illustrative.
+This guide describes **v0.5.0**, using the exact labels on the Home Assistant device page. The defaults below are the integration's defaults, not a record of anyone's home configuration. Examples are illustrative.
 
 Open **Settings → Devices & services → Devices → your Better Cover device**. Daily actions are under **Controls**, the reason for its behavior is under **Sensors**, and editable settings are under **Configuration**. Click an entity if you need its full control or attributes. Settings can also be added to a dashboard.
 
@@ -40,6 +40,8 @@ Routine setting changes preserve a manual pause. Changing the occupancy sensor s
 
 **Highest priority: window clearance during forced close.** An ON Forced close entity requests 0% when the window is closed, or the lowest opening allowed by the window-open range when open. It overrides the ordinary rules below without a timeout.
 
+The **Recalculate and move** button makes a one-time exception to the OFF/manual-pause checks below, preserving both states. Forced close and the applicable window limits still apply.
+
 When forced close is inactive, the controller decides whether it may move:
 
 | Condition | Result |
@@ -52,19 +54,42 @@ When forced close is inactive, the controller decides whether it may move:
 | Priority | Condition | Requested position |
 |---|---|---|
 | 1 | Outside the daytime schedule | **Nighttime privacy opening** |
-| 2 | Room brightness has entered the dark state | **Daytime opening**, even if it is hot outside |
-| 3 | Sun is below the horizon, or is 90° or more away from the outward window direction | **Daytime opening** |
-| 4 | Direct sun; outside temperature is strictly above thermostat target + temperature difference | **Hot-weather opening** |
-| 5 | Direct sun; outside temperature is strictly below thermostat target − temperature difference | **Daytime opening** |
-| 6 | Direct sun, with neither temperature condition applying | Calculated sun-tracking position |
+| 2 | Positioning mode is Schedule only | **Daytime opening**; ignore brightness, temperature, and sun geometry |
+| 3 | Room brightness has entered the dark state | **Daytime opening**, even if it is hot outside |
+| 4 | Sun is below the horizon, or is 90° or more away from the outward window direction | **Daytime opening** |
+| 5 | Direct sun; outside temperature is strictly above thermostat target + temperature difference | **Hot-weather opening** |
+| 6 | Direct sun; outside temperature is strictly below thermostat target − temperature difference | **Daytime opening** |
+| 7 | Direct sun, with neither temperature condition applying | Calculated sun-tracking position |
 
 The requested position is then restricted to the **normal range**, or to the **window-open range** when the contact is open. The window-open range **replaces** the normal range; it does not intersect it. These ranges apply at night too.
 
-A daytime calculation with missing sun data normally waits instead of using rows 3–6. The dark-room rule can still apply without sun data, and window clearance can still be corrected. Night scheduling does not need sun data.
+A daytime calculation with missing sun data normally waits instead of using rows 4–7. The dark-room rule can still apply without sun data, and window clearance can still be corrected. Night scheduling does not need sun data.
 
 The most recent day/night boundary determines the schedule, including across midnight. **Daytime begins at** and **Nighttime privacy begins at** select fixed or solar boundaries. Existing controllers default to Fixed time, preserving their schedules.
 
 Movement thresholds can delay or suppress a command even when Status shows a new target. Inputs trigger reevaluation, and a timer reevaluates every 30 seconds. Nighttime and morning reset are not guaranteed to command movement at the exact second shown on the clock.
+
+## Dawn/dusk and sleep only
+
+On each Better Cover device, set:
+
+| Setting | Value |
+|---|---|
+| Positioning mode | **Schedule only** |
+| Daytime begins at | **Dawn** |
+| Daytime opening | **100%** |
+| Nighttime privacy begins at | **Dusk** |
+| Nighttime privacy opening | **0%** |
+| Minimum opening / Maximum opening | **0% / 100%** for full normal travel |
+| Forced close entity | Your sleep helper, for example `input_boolean.sleep_mode` |
+| Window contact sensor and window-open minimum/maximum | Keep the clearance settings appropriate for that window |
+| Automatic control | **ON** |
+
+The saved clock fields are ignored when Dawn/Dusk are selected. No brightness, temperature, or sun geometry settings influence this mode; configured sources may remain selected. Dawn/dusk use Home Assistant's location and civil twilight, so check HA's location settings.
+
+During daytime the target is open; from dusk until dawn it is closed. Sleep ON requests closure for as long as it stays ON, always respecting window-open clearance. Sleep OFF returns to the current schedule if automation is ON and no manual pause applies. These are maintained targets, reevaluated on events and about every 30 seconds, rather than commands fired only at two instants.
+
+Manual changes still pause the schedule. **Dusk does not clear a manual pause.** Use Resume automatic control to clear one, or Recalculate and move for a single scheduled move while preserving it. Morning reset is an independent clock time; it does not automatically move with dawn. The normal movement filters still apply to schedule transitions.
 
 ## Copy an existing setup
 
@@ -100,6 +125,18 @@ Stop is offered only for a supported channel. A window-limit correction may subs
 
 Press to clear the manual pause **and enable Automatic control**, then recalculate. Resume bypasses the ordinary time-between-moves wait, but a target within **Minimum movement** of the current position may still produce no move. Duplicate commands for a target already being approached can also be suppressed.
 
+### Manual mode
+
+A binary sensor: **ON** means a manual pause is stored; **OFF** means no manual pause. It is available on the device page and can be added to a dashboard or used in an automation. For a group, ON means at least one loaded member is paused.
+
+This is separate from **Automatic control**: switching automation OFF does not itself mean manual mode. The indicator remains ON while forced close temporarily overrides a stored pause, and after a one-time recalculation. Resume automatic control clears it; the configured morning/vacancy/away resume rules can also clear it. The indicator reflects detected manual actions, with the hardware-detection limits described above.
+
+### Recalculate and move
+
+Press to calculate the target using the current schedule and inputs and send that target to the hardware immediately. It works even when manually paused or Automatic control is OFF, and **keeps the existing pause and ON/OFF state**. This is a one-time command; it does not enable ongoing automation or reset the manual timer. Normal resume rules continue afterward.
+
+This button bypasses Minimum movement, Minimum time between moves, and duplicate-command/motor-settling suppression. It still applies the active normal/window-open limits and forced-close rule. It cannot override an active sleep helper to open the shade. Unavailable hardware/position or unresolved required schedule/input data prevents a calculated move; check Status. For groups, each member recalculates using its own settings.
+
 ### Status
 
 This is an explanation, not a switch. Open it to inspect its attributes:
@@ -120,7 +157,7 @@ This is an explanation, not a switch. Open it to inspect its attributes:
 | `source_cover` | Original hardware cover controlled by this controller. |
 | `group_members` | Controller identifiers for a group. |
 
-Typical messages include **Automatic control off**, **Manual pause**, **Night schedule**, **Room is dark**, **No direct sun**, **Warmer outside · shading**, **Cooler outside · admitting sun**, **Sun tracking**, and **Sun tracking · slat tilt**. A **window-open limits** suffix means that range is active. **Waiting for sun data**, **Waiting for cover position**, or **Cover command failed; will retry** explains a missing input or unsuccessful command.
+Typical messages include **Day schedule**, **Automatic control off**, **Manual pause**, **Night schedule**, **Room is dark**, **No direct sun**, **Warmer outside · shading**, **Cooler outside · admitting sun**, **Sun tracking**, and **Sun tracking · slat tilt**. A **window-open limits** suffix means that range is active. **Waiting for sun data**, **Waiting for cover position**, or **Cover command failed; will retry** explains a missing input or unsuccessful command.
 
 <a id="configuration-settings"></a>
 
@@ -377,6 +414,8 @@ Select a member to remove it immediately. This removes membership only; it does 
 - **Cover:** an open/close/percentage request goes to every member through that member's limits and starts a manual pause on each. Different members can therefore finish at different positions.
 - **Automatic control:** ON enables and resumes all members; OFF disables automatic control on all members. The group switch reads ON only if every loaded member is enabled, so OFF may mean a mixture of enabled/disabled members.
 - **Resume automatic control:** clears all members' pauses and enables each member.
+- **Manual mode:** ON when any loaded member is paused.
+- **Recalculate and move:** makes a one-time move for each member while preserving its pause and enabled state.
 - **Status:** summarizes unavailable members, manual pauses, or automatic-control state. Inspect individual members for their detailed targets and reasons.
 
 The group's cover percentage averages normalized member openings. In a mixed group this averages lift opening for some members and slat opening for others; it is not a measurement of one physical window. Automatic mode lets each member calculate independently. Group Status does not calculate its own sun target; its target/source attributes can be empty even while members are working.
@@ -418,3 +457,8 @@ With automation ON, manually move the Better Cover entity. It enters Manual paus
 | Some group members do not match | Limits, inversion, and automatic rules are per member. Check each member's Status. |
 
 Implementation references: [settings and validation](../custom_components/better_cover/settings.py), [defaults](../custom_components/better_cover/const.py), [decision rules](../custom_components/better_cover/logic.py), [movement and resume behavior](../custom_components/better_cover/controller.py), [group behavior](../custom_components/better_cover/group.py). These links are for verifying behavior; normal setup uses the device controls described above.
+
+
+## Positioning mode
+
+**Default: Sun tracking.** Choose on the device's Configuration section, or in the setup/options Schedule form. **Sun tracking** retains all existing sun, brightness, temperature, and privacy rules. **Schedule only** chooses Daytime opening during daytime and Nighttime privacy opening otherwise, without using brightness, temperature, window direction, or geometry. Both modes retain forced close, manual pauses, travel/window limits, movement filtering, and fixed/solar scheduling. Copies inherit this setting. A group uses each member's own mode.

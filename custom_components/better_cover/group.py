@@ -91,5 +91,12 @@ class GroupController:
     async def set_enabled(self, enabled):
         await self._each("set_enabled", enabled)
 
+    @property
+    def manual_mode(self):
+        return any(c.manual_mode for c in self.members)
+
+    async def recalculate(self):
+        await self._each("recalculate")
+
     async def stop(self):
         await self._each("stop")

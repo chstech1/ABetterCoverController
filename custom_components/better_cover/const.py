@@ -1,9 +1,11 @@
 """Constants for Better Cover."""
 
 DOMAIN = "better_cover"
+POSITIONING_MODES = {"Sun tracking": "sun_tracking", "Schedule only": "schedule_only"}
 DEFAULTS = {
     "name": "Better Cover",
     "control_type": "position",
+    "positioning_mode": "sun_tracking",
     "invert_position": False,
     "azimuth": 180,
     "window_height": 1.5,

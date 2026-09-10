@@ -252,10 +252,22 @@ class Controller:
         self.context_ids = (self.context_ids + [context.id])[-20:]
         return context
 
-    async def send(self, target):
+    @property
+    def manual_mode(self):
+        return self.paused_at is not None
+
+    async def recalculate(self):
+        await self.evaluate(force=True, one_shot=True)
+
+    async def send(self, target, force=False):
         if self.forced_closed:
             target = self.forced_close_target
-        if self.expected == target and self.moving_until and dt_util.utcnow() < self.moving_until:
+        if (
+            not force
+            and self.expected == target
+            and self.moving_until
+            and dt_util.utcnow() < self.moving_until
+        ):
             return
         context = self.new_context()
         now = dt_util.utcnow()
@@ -281,7 +293,7 @@ class Controller:
             raise
         self.last_sent = now
 
-    async def update_inputs(self, now):
+    async def update_inputs(self, now, allow_resume=True):
         occupancy = self.state("occupancy_entity")
         if occupancy and occupancy.state == "off":
             self.empty_since = self.empty_since or now
@@ -295,7 +307,7 @@ class Controller:
             self.dark = True
         elif lux >= self.config["bright_lux"]:
             self.dark = False
-        if not self.paused_at:
+        if not self.paused_at or not allow_resume:
             return
         home = self.state("home_entity")
         # Resume on a vacancy transition after the manual action, not continuously
@@ -315,13 +327,18 @@ class Controller:
             self.paused_at = None
             await self.save()
 
-    async def evaluate(self, force=False):
+    async def evaluate(self, force=False, one_shot=False):
         async with self.lock:
             try:
-                await self._evaluate(force)
+                await self._evaluate(force, one_shot)
             except HomeAssistantError as err:
-                self.reason = "Cover command failed; will retry"
+                self.reason = (
+                    "Cover command failed" if one_shot else "Cover command failed; will retry"
+                )
                 _LOGGER.warning("Unable to move %s: %s", self.config["cover_entity"], err)
+                if one_shot:
+                    self.publish()
+                    raise
             self.publish()
 
     def temperatures(self):
@@ -350,7 +367,7 @@ class Controller:
         except ValueError:
             return None, None
 
-    async def _evaluate(self, force):
+    async def _evaluate(self, force, one_shot=False):
         now = dt_util.utcnow()
         if self.forced_closed:
             self.target = self.forced_close_target
@@ -359,10 +376,10 @@ class Controller:
             )
             if not self.available:
                 self.reason += " · waiting for cover position"
-            elif self.position != self.target:
-                await self.send(self.target)
+            elif one_shot or self.position != self.target:
+                await self.send(self.target, force=one_shot)
             return
-        await self.update_inputs(now)
+        await self.update_inputs(now, allow_resume=not one_shot)
         sun = self.hass.states.get("sun.sun")
         outside, indoor_target = self.temperatures()
         self.schedule = resolve_schedule(self.hass, self.config, now)
@@ -384,7 +401,7 @@ class Controller:
             else Decision(None, "Waiting for schedule boundaries")
         )
         self.target = decision.position
-        if not self.enabled:
+        if not self.enabled and not one_shot:
             self.reason = "Automatic control off"
             return
         if not self.available:
@@ -392,7 +409,7 @@ class Controller:
             return
         low, high = limits(self.config, self.window_open)
         outside_limits = not low <= self.position <= high
-        if self.paused_at:
+        if self.paused_at and not one_shot:
             self.reason = "Manual pause"
             if self.window_open and self.config["window_overrides_manual"] and outside_limits:
                 self.reason = "Manual pause · enforcing window-open limits"
@@ -403,6 +420,10 @@ class Controller:
             # Window clearance still applies when environmental data is absent.
             if self.window_open and outside_limits:
                 await self.send(clamp(self.position, self.config, True))
+            return
+        if one_shot:
+            await self.send(decision.position, force=True)
+            self.reason += " · one-time move"
             return
         if abs(decision.position - self.position) < (
             1 if outside_limits else self.config["min_change"]

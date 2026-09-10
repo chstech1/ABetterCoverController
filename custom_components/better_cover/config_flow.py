@@ -9,7 +9,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
-from .const import DEFAULTS, DOMAIN
+from .const import DEFAULTS, DOMAIN, POSITIONING_MODES
 from .logic import validate
 from .schedule import SCHEDULE_MODES
 
@@ -17,6 +17,7 @@ STEPS = {
     "shade": ["name", "cover_entity", "control_type", "invert_position"],
     "sun": ["azimuth", "window_height", "sun_depth", "slat_width", "slat_spacing"],
     "schedule": [
+        "positioning_mode",
         "day_start_mode",
         "day_start",
         "night_start_mode",
@@ -81,12 +82,11 @@ def schema(step, values):
                 "occupancy_entity": "binary_sensor",
             }[key]
             field = selector.EntitySelector(selector.EntitySelectorConfig(domain=domain))
-        elif key in ("day_start_mode", "night_start_mode"):
+        elif key in ("day_start_mode", "night_start_mode", "positioning_mode"):
+            choices = POSITIONING_MODES if key == "positioning_mode" else SCHEDULE_MODES
             field = selector.SelectSelector(
                 selector.SelectSelectorConfig(
-                    options=[
-                        {"value": value, "label": label} for label, value in SCHEDULE_MODES.items()
-                    ]
+                    options=[{"value": value, "label": label} for label, value in choices.items()]
                 )
             )
         elif key == "control_type":
