@@ -468,7 +468,7 @@ With automation ON, manually move the Better Cover entity. It enters Manual paus
 | Room still occupied when automation resumes | Verify the room sensor represents occupancy, not merely a short motion-clear timeout. Also check whether the house-away or morning-reset trigger fired. |
 | Some group members do not match | Limits, inversion, and automatic rules are per member. Check each member's Status. |
 
-Implementation references: [settings and validation](../custom_components/better_cover/settings.py), [defaults](../custom_components/better_cover/const.py), [decision rules](../custom_components/better_cover/logic.py), [movement and resume behavior](../custom_components/better_cover/controller.py), [group behavior](../custom_components/better_cover/group.py). These links are for verifying behavior; normal setup uses the device controls described above.
+Implementation references: [settings and validation](../custom_components/better_cover/settings.py), [defaults](../custom_components/better_cover/const.py), [decision rules](../custom_components/better_cover/logic.py), [movement and resume behavior](../custom_components/better_cover/controller.py), [group behavior](../custom_components/better_cover/group_controller.py). These links are for verifying behavior; normal setup uses the device controls described above.
 
 
 ## Positioning mode

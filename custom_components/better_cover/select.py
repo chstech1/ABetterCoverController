@@ -1,9 +1,14 @@
 """Source choices and group membership controls on device pages."""
 
+from collections.abc import Mapping
+
 from homeassistant.components.select import SelectEntity
-from homeassistant.core import callback
+from homeassistant.const import EVENT_STATE_CHANGED
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.event import async_call_later
+from homeassistant.util.hass_dict import HassKey
 
 from .const import DOMAIN, POSITIONING_MODES
 from .schedule import SCHEDULE_MODES, SCHEDULE_SETTINGS
@@ -12,6 +17,135 @@ from .settings import SOURCES, SettingEntity, update_settings
 NONE = "Not configured"
 CHOOSE = "Choose a member"
 CHANNELS = {"Raise / lower": "position", "Slat tilt": "tilt"}
+SOURCE_DOMAINS = frozenset(domain for _, domains in SOURCES.values() for domain in domains)
+SOURCE_SELECT_DEBOUNCE_SECONDS = 0.1
+
+
+class SourceSelectCoordinator:
+    """Share source discovery between all source selects."""
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+        self.selects: set[SourceSelect] = set()
+        self._pending_domains: set[str] = set()
+        self._cancel_refresh = None
+        self._available = self._available_entities()
+        self._unsubscribers = (
+            hass.bus.async_listen(
+                EVENT_STATE_CHANGED,
+                self._state_changed,
+                event_filter=self._state_change_affects_options,
+            ),
+            hass.bus.async_listen(
+                er.EVENT_ENTITY_REGISTRY_UPDATED,
+                self._registry_changed,
+                event_filter=self._registry_change_affects_options,
+            ),
+        )
+
+    @callback
+    def async_add(self, entity: "SourceSelect") -> None:
+        """Register one select without adding another global listener."""
+        self.selects.add(entity)
+        entity._set_options(self._available, er.async_get(self.hass))
+
+    @callback
+    def async_remove(self, entity: "SourceSelect") -> None:
+        """Unregister one select and tear down the shared listeners when empty."""
+        self.selects.discard(entity)
+        if self.selects:
+            return
+        if self._cancel_refresh:
+            self._cancel_refresh()
+            self._cancel_refresh = None
+        for unsubscribe in self._unsubscribers:
+            unsubscribe()
+        if self.hass.data.get(DATA_SOURCE_SELECT_COORDINATOR) is self:
+            self.hass.data.pop(DATA_SOURCE_SELECT_COORDINATOR)
+
+    @callback
+    def _state_change_affects_options(self, data) -> bool:
+        """Accept only entity additions and removals in selectable domains."""
+        entity_id = data.get("entity_id", "")
+        old_state = data.get("old_state")
+        new_state = data.get("new_state")
+        return (
+            entity_id.partition(".")[0] in SOURCE_DOMAINS
+            and (old_state is None) != (new_state is None)
+        )
+
+    @callback
+    def _registry_change_affects_options(self, data) -> bool:
+        """Accept registry changes that can add, remove, rename, or disable an option."""
+        entity_ids = (data.get("entity_id", ""), data.get("old_entity_id", ""))
+        if not any(entity_id.partition(".")[0] in SOURCE_DOMAINS for entity_id in entity_ids):
+            return False
+        if data.get("action") != "update":
+            return True
+        return "old_entity_id" in data or "disabled_by" in data.get("changes", {})
+
+    @callback
+    def _state_changed(self, event) -> None:
+        self._schedule_refresh({event.data["entity_id"].partition(".")[0]})
+
+    @callback
+    def _registry_changed(self, event) -> None:
+        data = event.data
+        domains = {
+            entity_id.partition(".")[0]
+            for entity_id in (data.get("entity_id", ""), data.get("old_entity_id", ""))
+            if entity_id.partition(".")[0] in SOURCE_DOMAINS
+        }
+        self._schedule_refresh(domains)
+
+    @callback
+    def _schedule_refresh(self, domains: set[str]) -> None:
+        """Coalesce a burst of registry/state events into one option refresh."""
+        self._pending_domains.update(domains)
+        if self._cancel_refresh:
+            self._cancel_refresh()
+        self._cancel_refresh = async_call_later(
+            self.hass, SOURCE_SELECT_DEBOUNCE_SECONDS, self._refresh
+        )
+
+    @callback
+    def _refresh(self, _now) -> None:
+        """Write only selects whose computed options actually changed."""
+        self._cancel_refresh = None
+        domains, self._pending_domains = self._pending_domains, set()
+        self._available = self._available_entities()
+        registry = er.async_get(self.hass)
+        for entity in tuple(self.selects):
+            if domains.intersection(SOURCES[entity.key][1]) and entity._set_options(
+                self._available, registry
+            ):
+                entity.async_write_ha_state()
+
+    @callback
+    def _available_entities(self) -> dict[str, set[str]]:
+        """Snapshot selectable state and registry entities once per refresh."""
+        available = {domain: set() for domain in SOURCE_DOMAINS}
+        for state in self.hass.states.async_all():
+            if state.domain in available:
+                available[state.domain].add(state.entity_id)
+        for entry in er.async_get(self.hass).entities.values():
+            if entry.domain in available and not entry.disabled_by:
+                available[entry.domain].add(entry.entity_id)
+        return available
+
+
+DATA_SOURCE_SELECT_COORDINATOR: HassKey[SourceSelectCoordinator] = HassKey(
+    f"{DOMAIN}_source_select_coordinator"
+)
+
+
+@callback
+def _source_select_coordinator(hass: HomeAssistant) -> SourceSelectCoordinator:
+    if coordinator := hass.data.get(DATA_SOURCE_SELECT_COORDINATOR):
+        return coordinator
+    coordinator = SourceSelectCoordinator(hass)
+    hass.data[DATA_SOURCE_SELECT_COORDINATOR] = coordinator
+    return coordinator
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -28,16 +162,23 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 
 class SourceSelect(SettingEntity, SelectEntity):
+    _attr_options: list[str]
+
+    def __init__(self, controller, key, name):
+        super().__init__(controller, key, name)
+        self._attr_options = []
+
     @property
-    def options(self):
+    def current_option(self):
+        return self.saved.get(self.key, NONE)
+
+    @callback
+    def _set_options(
+        self, available: Mapping[str, set[str]], registry: er.EntityRegistry
+    ) -> bool:
+        """Cache options and report whether the entity state needs a write."""
         domains = SOURCES[self.key][1]
-        registry = er.async_get(self.hass)
-        ids = {s.entity_id for s in self.hass.states.async_all() if s.domain in domains}
-        ids.update(
-            e.entity_id
-            for e in registry.entities.values()
-            if e.domain in domains and not e.disabled_by
-        )
+        ids = set().union(*(available[domain] for domain in domains))
         if self.key == "cover_entity":
             ids = {
                 entity_id
@@ -50,29 +191,20 @@ class SourceSelect(SettingEntity, SelectEntity):
         current = self.saved.get(self.key)
         if current:
             ids.add(current)
-        return ([NONE] if self.key != "cover_entity" else []) + sorted(ids)
-
-    @property
-    def current_option(self):
-        return self.saved.get(self.key, NONE)
+        options = ([NONE] if self.key != "cover_entity" else []) + sorted(ids)
+        if options == self._attr_options:
+            return False
+        self._attr_options = options
+        return True
 
     async def async_select_option(self, option):
         await self.write(None if option == NONE else option)
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
-
-        @callback
-        def changed(event):
-            if (
-                event.event_type == "entity_registry_updated"
-                or event.data.get("old_state") is None
-                or event.data.get("new_state") is None
-            ):
-                self.async_write_ha_state()
-
-        self.async_on_remove(self.hass.bus.async_listen("state_changed", changed))
-        self.async_on_remove(self.hass.bus.async_listen("entity_registry_updated", changed))
+        coordinator = _source_select_coordinator(self.hass)
+        coordinator.async_add(self)
+        self.async_on_remove(lambda: coordinator.async_remove(self))
 
 
 class ChannelSelect(SettingEntity, SelectEntity):

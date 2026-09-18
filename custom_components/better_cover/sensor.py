@@ -4,7 +4,7 @@ from homeassistant.components.sensor import SensorEntity
 
 from .const import DOMAIN
 from .entity import BetterEntity
-from .group import GroupController
+from .group_controller import GroupController
 
 
 async def async_setup_entry(hass, entry, async_add_entities):

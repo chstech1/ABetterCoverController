@@ -174,7 +174,7 @@ Sun geometry assumes an unobstructed window. It does not model trees, overhangs,
 ## Development
 
 ```sh
-uv venv --python 3.13 .venv
+uv venv --python 3.14 .venv
 uv pip install --python .venv/bin/python -r requirements-dev.txt
 .venv/bin/pytest -q
 .venv/bin/ruff check custom_components tests

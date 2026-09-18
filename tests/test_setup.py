@@ -1,5 +1,6 @@
 """Exercise the actual HA flow manager and entity platforms."""
 
+import asyncio
 import shutil
 from pathlib import Path
 
@@ -10,6 +11,11 @@ from homeassistant.helpers import device_registry, entity_registry, frame
 
 from custom_components.better_cover.config_flow import STEPS
 from custom_components.better_cover.const import DEFAULTS, DOMAIN
+from custom_components.better_cover.select import (
+    DATA_SOURCE_SELECT_COORDINATOR,
+    SOURCE_SELECT_DEBOUNCE_SECONDS,
+    SourceSelect,
+)
 
 
 @pytest.fixture
@@ -20,6 +26,8 @@ async def hass(tmp_path):
     frame.async_setup(instance)
     instance.config_entries = config_entries.ConfigEntries(instance, {})
     await instance.config_entries.async_initialize()
+    if hasattr(device_registry, "async_setup"):
+        device_registry.async_setup(instance)
     await device_registry.async_load(instance)
     await entity_registry.async_load(instance)
     instance.states.async_set(
@@ -55,6 +63,13 @@ async def add_shade(hass, source="cover.real", name="Better Cover"):
     return result["result"]
 
 
+async def settle_source_selects(hass):
+    """Wait for the deliberately trailing source-option debounce."""
+    await hass.async_block_till_done()
+    await asyncio.sleep(SOURCE_SELECT_DEBOUNCE_SECONDS * 1.5)
+    await hass.async_block_till_done()
+
+
 async def test_full_setup_group_options_and_unload(hass):
     entry = await add_shade(hass)
     assert entry.state is config_entries.ConfigEntryState.LOADED
@@ -86,6 +101,18 @@ async def test_full_setup_group_options_and_unload(hass):
     hass.config_entries.options.async_abort(options["flow_id"])
     assert await hass.config_entries.async_unload(group.entry_id)
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_internal_group_controller_is_not_a_group_platform(hass, caplog):
+    """The internal group controller must not be discovered as HA's group platform."""
+    from homeassistant.setup import async_setup_component
+
+    await add_shade(hass)
+    integration = await loader.async_get_integration(hass, DOMAIN)
+    assert integration.platforms_exists(("group",)) == []
+    assert await async_setup_component(hass, "group", {})
+    await hass.async_block_till_done()
+    assert "async_describe_on_off_states" not in caplog.text
 
 
 async def test_options_save_and_reload(hass):
@@ -162,7 +189,7 @@ async def test_device_configuration_entities(hass):
     assert len(settings) == 33  # 16 numbers, 3 times, 2 switches, 12 selects
     c = hass.data[DOMAIN][entry.entry_id]
     hass.states.async_set("binary_sensor.occupied", "off")
-    await hass.async_block_till_done()
+    await settle_source_selects(hass)
     await hass.services.async_call(
         "select",
         "select_option",
@@ -214,7 +241,7 @@ async def test_device_source_selection_and_clear(hass):
     entry = await add_shade(hass)
     c = hass.data[DOMAIN][entry.entry_id]
     hass.states.async_set("binary_sensor.new_window", "off")
-    await hass.async_block_till_done()
+    await settle_source_selects(hass)
     selector_id = "select.better_cover_window_contact_sensor"
     assert "binary_sensor.new_window" in hass.states.get(selector_id).attributes["options"]
     await hass.services.async_call(
@@ -237,6 +264,77 @@ async def test_device_source_selection_and_clear(hass):
     await hass.async_block_till_done()
     assert "window_entity" not in c.config
     assert not c.window_open
+
+
+async def test_source_select_registry_updates_are_shared_debounced_and_bounded(
+    hass, monkeypatch
+):
+    """A registry burst refreshes 56 selects once and writes only changed options."""
+    await add_shade(hass, name="Shade 0")
+    for index in range(1, 7):
+        entity_id = f"cover.real_{index}"
+        hass.states.async_set(
+            entity_id, "open", {"supported_features": 255, "current_position": 100}
+        )
+        await add_shade(hass, entity_id, f"Shade {index}")
+    await settle_source_selects(hass)
+
+    coordinator = hass.data[DATA_SOURCE_SELECT_COORDINATOR]
+    assert len(coordinator.selects) == 56
+
+    # Ordinary state transitions never affect the option set and are filtered
+    # before they can schedule a refresh.
+    hass.states.async_set("binary_sensor.steady", "off")
+    await settle_source_selects(hass)
+    writes = []
+    snapshots = 0
+    original_write = SourceSelect.async_write_ha_state
+    original_snapshot = coordinator._available_entities
+
+    def record_write(entity):
+        writes.append((entity.entity_id, entity.key))
+        original_write(entity)
+
+    def record_snapshot():
+        nonlocal snapshots
+        snapshots += 1
+        return original_snapshot()
+
+    monkeypatch.setattr(SourceSelect, "async_write_ha_state", record_write)
+    monkeypatch.setattr(coordinator, "_available_entities", record_snapshot)
+    hass.states.async_set("binary_sensor.steady", "on")
+    hass.states.async_set("light.unrelated", "on")
+    await settle_source_selects(hass)
+    assert snapshots == 0
+    assert writes == []
+
+    # Twenty back-to-back registry creations collapse to one snapshot. Only
+    # the three sensor-capable dropdowns per controller get one state write.
+    registry = entity_registry.async_get(hass)
+    for index in range(20):
+        registry.async_get_or_create(
+            "sensor", "test", f"burst_{index}", suggested_object_id=f"burst_{index}"
+        )
+    await settle_source_selects(hass)
+    assert snapshots == 1
+    changed_entities = {entity_id for entity_id, _key in writes}
+    assert len(changed_entities) == 21
+    # HA may immediately write each changed select once more after synchronizing
+    # its new options into that select's own entity-registry capabilities.
+    assert len(writes) <= 42
+    assert {key for _entity_id, key in writes} == {
+        "light_entity",
+        "temperature_entity",
+        "thermostat_entity",
+    }
+
+    # The select state writes above must not recursively schedule another scan,
+    # and irrelevant registry metadata must not schedule one either.
+    await settle_source_selects(hass)
+    registry.async_update_entity("sensor.burst_0", name="Renamed")
+    await settle_source_selects(hass)
+    assert snapshots == 1
+    assert len(writes) <= 42
 
 
 async def test_device_rejects_invalid_limits(hass):
@@ -265,7 +363,7 @@ async def test_device_temperature_sources_set_one_at_a_time(hass):
     entry = await add_shade(hass)
     hass.states.async_set("sensor.outside", "90", {"unit_of_measurement": "°F"})
     hass.states.async_set("climate.home", "cool", {"temperature": 21})
-    await hass.async_block_till_done()
+    await settle_source_selects(hass)
     await hass.services.async_call(
         "select",
         "select_option",
@@ -446,7 +544,7 @@ async def test_sleep_helper_selection_and_reload(hass):
 
     entry = await add_shade(hass)
     hass.states.async_set("input_boolean.sleep", "off")
-    await hass.async_block_till_done()
+    await settle_source_selects(hass)
     entity_id = "select.better_cover_forced_close_entity"
     assert "input_boolean.sleep" in hass.states.get(entity_id).attributes["options"]
     await hass.services.async_call(

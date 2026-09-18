@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 
 from custom_components.better_cover.const import DOMAIN
-from custom_components.better_cover.group import GroupController
+from custom_components.better_cover.group_controller import GroupController
 from custom_components.better_cover.sensor import DesiredPositionSensor
 
 

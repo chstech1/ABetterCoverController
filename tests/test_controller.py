@@ -9,7 +9,7 @@ from homeassistant.util import dt as dt_util
 
 from custom_components.better_cover.const import DOMAIN
 from custom_components.better_cover.controller import Controller
-from custom_components.better_cover.group import GroupController
+from custom_components.better_cover.group_controller import GroupController
 
 
 @pytest.fixture

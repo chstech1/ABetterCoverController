@@ -2,7 +2,7 @@
 
 from .const import DOMAIN
 from .controller import Controller
-from .group import GroupController
+from .group_controller import GroupController
 
 PLATFORMS = ["binary_sensor", "cover", "switch", "sensor", "button", "number", "time", "select"]
 
