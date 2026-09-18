@@ -70,7 +70,7 @@ async def test_full_setup_group_options_and_unload(hass):
             )
         )
     ]
-    assert len(states) == 7
+    assert len(states) == 8
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"next_step_id": "group"}
@@ -497,3 +497,28 @@ async def test_manual_indicator_button_and_positioning_mode(hass):
     await hass.async_block_till_done()
     assert hass.states.get("select.better_cover_positioning_mode").state == "Schedule only"
     assert hass.states.get("binary_sensor.better_cover_manual_mode").state == "on"
+
+
+async def test_desired_position_updates_and_restores_manual(hass):
+    entry = await add_shade(hass)
+    c = hass.data[DOMAIN][entry.entry_id]
+    entity_id = "sensor.better_cover_desired_position"
+    c.target = 75
+    c.publish()
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == "75%"
+    assert hass.states.get(entity_id).attributes["current_percent_open"] == 100
+    assert not hass.states.get(entity_id).attributes["automatic_control_enabled"]
+    await c.pause()
+    c.publish()
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == "Manual"
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == "Manual"
+    c = hass.data[DOMAIN][entry.entry_id]
+    c.paused_at = None
+    c.target = None
+    c.publish()
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == "unknown"

@@ -1,6 +1,6 @@
 # Better Cover: every device setting explained
 
-This guide describes **v0.5.0**, using the exact labels on the Home Assistant device page. The defaults below are the integration's defaults, not a record of anyone's home configuration. Examples are illustrative.
+This guide describes **v0.6.0**, using the exact labels on the Home Assistant device page. The defaults below are the integration's defaults, not a record of anyone's home configuration. Examples are illustrative.
 
 Open **Settings → Devices & services → Devices → your Better Cover device**. Daily actions are under **Controls**, the reason for its behavior is under **Sensors**, and editable settings are under **Configuration**. Click an entity if you need its full control or attributes. Settings can also be added to a dashboard.
 
@@ -136,6 +136,18 @@ This is separate from **Automatic control**: switching automation OFF does not i
 Press to calculate the target using the current schedule and inputs and send that target to the hardware immediately. It works even when manually paused or Automatic control is OFF, and **keeps the existing pause and ON/OFF state**. This is a one-time command; it does not enable ongoing automation or reset the manual timer. Normal resume rules continue afterward.
 
 This button bypasses Minimum movement, Minimum time between moves, and duplicate-command/motor-settling suppression. It still applies the active normal/window-open limits and forced-close rule. It cannot override an active sleep helper to open the shade. Unavailable hardware/position or unresolved required schedule/input data prevents a calculated move; check Status. For groups, each member recalculates using its own settings.
+
+### Desired position
+
+Shows the controller's currently calculated opening as text, such as **75%**, or **Manual** whenever a manual pause is stored. Percentages always mean percent open: 0% closed, 100% open, including inverted hardware and tilt channels. This is the desired target, not the motor's reported physical position. Travel/window limits and forced close are already included in the calculated target.
+
+Manual takes display priority even if forced close is temporarily enforcing a position; inspect Status and the `forced_close_active` attribute for that condition. Recalculate and move preserves a manual pause, so the sensor continues to say Manual afterward. Disabling Automatic control alone does not create a manual pause: the sensor still shows the calculated target, but that does not mean movement is enabled.
+
+For a group, **Manual** means any loaded member is paused; a percentage means all members have that same target; **Mixed** means their targets differ. Missing members or missing required calculation data produce **Unknown** unless a manual pause applies. Group targets are not averaged.
+
+Attributes include `target_percent_open` (the shared target, or empty if there is none), `current_percent_open` (reported actual opening; group average), `automatic_control_enabled`, `manual_mode`, and `forced_close_active`. Groups also include `member_targets`, keyed by controller entry ID. A calculable target can still be shown while hardware is unavailable; Status explains why it cannot move.
+
+Entity IDs normally follow `sensor.<device_name>_desired_position`, for example `sensor.master_bedroom_blinds_desired_position`. Existing naming conflicts or entity renames can change the exact ID. The sensor uses a text state so it can display Manual/Mixed; use its numeric target attribute when a numeric value is needed.
 
 ### Status
 

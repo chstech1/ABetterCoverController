@@ -81,11 +81,11 @@ A group must keep at least one member. Select a member in its Add or Remove drop
 
 Use the device's normal edit/rename controls to change its displayed name. The integration setup remains available for creating new controllers and groups; its Configure menu is an alternative editor for the same saved settings, not a required workflow.
 
-Existing installations: update to **v0.5.0** in HACS and restart Home Assistant. The configuration entities are added to your existing Better Cover devices. Existing entries and settings remain; do not delete and recreate them. Version 0.1.0 also incorrectly classified Better Cover as a helper; updating fixes that classification.
+Existing installations: update to **v0.6.0** in HACS and restart Home Assistant. The configuration entities are added to your existing Better Cover devices. Existing entries and settings remain; do not delete and recreate them. Version 0.1.0 also incorrectly classified Better Cover as a helper; updating fixes that classification.
 
 ## Daily controls
 
-Each controller has six daily-control entities, plus its configuration entities:
+Each controller has seven daily-control entities, plus its configuration entities:
 
 | Control | What it does |
 |---|---|
@@ -94,6 +94,7 @@ Each controller has six daily-control entities, plus its configuration entities:
 | Manual mode | Binary sensor: ON while manually paused; groups show ON if any member is paused |
 | Recalculate and move | One-time move to the current automatic target, preserving pause and enabled state; honors forced close and window limits |
 | Resume automatic control | Clears the manual pause and turns automation on immediately |
+| Desired position | Calculated opening such as 75%, or Manual during a pause; groups show Mixed if targets differ |
 | Status | Shows the current reason and attributes including target, current opening, pause, and window state |
 
 Use the new Cover / Slats entity in dashboards and automations. The original hardware cover remains available, but direct hardware commands bypass this integration's clamping. Direct entity-targeted HA cover commands are detected as manual actions, and physical moves are detected from position reports when possible.
